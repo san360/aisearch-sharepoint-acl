@@ -21,6 +21,7 @@
       <button data-tab="ask">Ask</button>
       <button data-tab="proof">Sites.Selected proof</button>
       <button data-tab="how">How it works</button>
+      <button data-tab="access">Access</button>
       <button data-tab="admin" class="hidden" id="adminTabBtn">Admin</button>
     </nav>
     <div class="user" id="userArea">
@@ -161,6 +162,24 @@
       </div>
       <div id="matrixMeta" class="muted small"></div>
       <table class="matrix" id="matrix"></table>
+    </section>
+
+    <!-- Access -->
+    <section id="tab-access" class="panel hidden">
+      <div class="panel-head">
+        <div>
+          <h2>Who has access — live from SharePoint</h2>
+          <p class="muted">Sites, folders and their permissions are read <b>now</b> from SharePoint through Microsoft Graph with
+            <b>your</b> delegated token, so you only see what SharePoint lets you see (site owners see every permission).
+            Links open SharePoint in a new tab with the same browser sign-in — use one InPrivate window per persona.</p>
+        </div>
+        <button class="btn" id="accessRefresh">Re-run</button>
+      </div>
+      <div id="accessMeta" class="muted small"></div>
+      <div class="table-wrap"><table class="matrix access" id="accessTable"></table></div>
+      <p class="muted small">👥 Entra group · 🟦 SharePoint site group · 👤 user · Levels: Read, Edit, Full control.
+        <b>Inherits from site</b>: the folder uses the site's permissions. <b>Unique</b>: inheritance is broken, so only the
+        listed principals can open it — site-level grants such as <i>All staff</i> no longer apply.</p>
     </section>
 
     <!-- Admin -->

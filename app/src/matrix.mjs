@@ -52,6 +52,30 @@ function evaluate(acl, who) {
   return null;
 }
 
+// Personas (demo users group) with their transitive Entra groups and, for sites the ingestion app may read,
+// their SharePoint site groups. Sites without a grant report null (membership can't be read).
+export async function peopleAccessContext() {
+  const indexedSites = config.sites.filter((s) => s.granted && s.url);
+  let spToken = null;
+  try {
+    spToken = (await ingestCredential()?.getToken(`https://${config.sharePointHost}/.default`))?.token ?? null;
+  } catch { /* site groups stay unknown */ }
+  const people = (await groupMembers(config.groups.demoUsers)).sort((a, b) => a.upn.localeCompare(b.upn));
+  return Promise.all(people.map(async (p) => {
+    const ctx = await principalContext(p, spToken, indexedSites);
+    return {
+      id: p.id,
+      upn: p.upn,
+      displayName: p.displayName,
+      groups: [...ctx.groups].map(([id, name]) => ({ id, name })),
+      spGroups: Object.fromEntries(config.sites.map((s) => {
+        const m = ctx.sp.get(normUrl(s.url));
+        return [s.key, m ? [...m.values()] : null];
+      })),
+    };
+  }));
+}
+
 export async function liveMatrix(user, { admin = false } = {}) {
   const started = Date.now();
   const sites = new Map(config.sites.map((s) => [s.key, s]));

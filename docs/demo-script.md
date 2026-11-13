@@ -31,7 +31,7 @@ Permissions are granted at two scopes:
 | ACL Demo - Research | `Public` | Site (inherited) | *All staff* | Inherits from the site | Read |
 | ACL Demo - Research | `Quantum` | **Folder (unique)** | *Quantum team* (Entra group: Alice) | Folder role assignment to an Entra group | Read |
 | ACL Demo - Research | `Bio` | **Folder (unique)** | Carol | Folder role assignment to a **user** (direct) | Read |
-| ACL Demo - Finance | *(whole site)* | **Site** | Bob | Member of the SharePoint **Members** site group | Edit (Members default) |
+| ACL Demo - Finance | *(whole site)* | **Site** | Bob | Member of the SharePoint **Members** site group | Edit (verified) |
 | ACL Demo - Finance | `Reports` | Site (inherited) | Bob | Inherits from the site (via *Members*) | Edit |
 | ACL Demo - HR Confidential | *(whole site)* | **Site** | *All staff* | Site role assignment | Read |
 | ACL Demo - HR Confidential | `Confidential` | Site (inherited) | *All staff* | Inherits from the site | Read — **never indexed** |
@@ -64,7 +64,9 @@ OSPREY is readable by everyone in SharePoint but never appears in search: the HR
 Each folder holds one *Access note* (with the codeword) and arXiv papers; documents inherit the folder's permissions. The
 full document list (D1–D14) is in [test-plan.md](test-plan.md#1-documents-and-who-can-read-them).
 
-## 0. Set the scene (admin, *How it works* tab)
+## 0. Set the scene (admin, *How it works* and *Access* tabs)
+
+* **Access** tab: the same tables as above, read live from SharePoint. Click a site or folder to open it in SharePoint (new tab, same sign-in); as a persona, a protected folder shows SharePoint's own access-denied page. *You · SharePoint* and *You · search* agree everywhere except HR (readable, never indexed).
 
 * Three SharePoint sites, five folders, five codewords.
 * The **live** who-can-see-what matrix is computed now, not hard-coded. Signed in as an admin, every persona's row comes

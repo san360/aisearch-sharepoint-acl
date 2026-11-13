@@ -124,6 +124,7 @@ function showTab(name) {
   if (name === 'proof') loadProof();
   if (name === 'admin') loadAdmin();
   if (name === 'how') renderMatrix();
+  if (name === 'access') loadAccess();
   history.replaceState(null, '', `#${name}`);
 }
 
@@ -172,7 +173,7 @@ async function afterSignIn() {
   }
   renderUser();
   const want = location.hash.slice(1);
-  showTab(['search', 'ask', 'proof', 'how', 'admin'].includes(want) && (want !== 'admin' || me?.isAdmin) ? want : 'search');
+  showTab(['search', 'ask', 'proof', 'how', 'access', 'admin'].includes(want) && (want !== 'admin' || me?.isAdmin) ? want : 'search');
 }
 
 // ---------- search ----------
@@ -412,6 +413,156 @@ async function renderMatrix() {
   }
 }
 
+// ---------- access (live SharePoint permissions) ----------
+const ROLE = { owner: ['Full control', 3], write: ['Edit', 2], read: ['Read', 1] };
+const KIND_ICON = { entra: '👥', sp: '🟦', user: '👤', link: '🔗', other: '•' };
+
+async function graphRead(path) {
+  const token = await getToken(cfg.graphReadScopes);
+  const res = await fetch(`https://graph.microsoft.com/v1.0${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  return { status: res.status, ok: res.ok, body: await res.json().catch(() => ({})) };
+}
+
+function permEntries(perms) {
+  return (perms ?? []).map((p) => {
+    const g = p.grantedToV2 ?? p.grantedTo ?? {};
+    let pr;
+    if (g.siteGroup) pr = { kind: 'sp', name: g.siteGroup.displayName };
+    else if (g.group) pr = { kind: 'entra', name: g.group.displayName, id: g.group.id };
+    else if (g.user) pr = { kind: 'user', name: g.user.displayName, id: g.user.id, email: g.user.email };
+    else if (p.link) pr = { kind: 'link', name: `${p.link.scope ?? ''} sharing link` };
+    else pr = { kind: 'other', name: g.siteUser?.displayName ?? '?' };
+    const role = (p.roles ?? []).map((r) => ROLE[r]).filter(Boolean).sort((a, b) => b[1] - a[1])[0] ?? [p.roles?.join(',') ?? '?', 0];
+    return { ...pr, role: role[0], rank: role[1], inherited: Boolean(p.inheritedFrom) };
+  });
+}
+
+function personaAccess(person, siteKey, entries) {
+  let best = null;
+  let unknownSp = false;
+  for (const e of entries) {
+    let hit = false;
+    if (e.kind === 'entra') hit = person.groups.some((g) => g.id === e.id || g.name === e.name);
+    else if (e.kind === 'user') hit = e.id === person.id || (e.email ?? '').toLowerCase() === person.upn.toLowerCase() || e.name === person.displayName;
+    else if (e.kind === 'sp') {
+      const sp = person.spGroups?.[siteKey];
+      if (sp == null) unknownSp = true;
+      else hit = sp.includes(e.name);
+    }
+    if (hit && (!best || e.rank > best.rank)) best = e;
+  }
+  return { best, unknownSp };
+}
+
+function spMembers(people, siteKey, groupName) {
+  if (!people) return '';
+  if (people.some((p) => p.spGroups?.[siteKey] == null)) return '';
+  const names = people.filter((p) => p.spGroups[siteKey].includes(groupName)).map((p) => p.displayName.split(' ')[0]);
+  return names.length ? ` <span class="muted">(${esc(names.join(', '))})</span>` : '';
+}
+
+function grantedHtml(entries, people, siteKey) {
+  return entries.filter((e) => e.kind !== 'link' || e.rank).map((e) =>
+    `<div class="grant">${KIND_ICON[e.kind]} ${esc(e.name)} <span class="role r${e.rank}">${esc(e.role)}</span>${e.kind === 'sp' ? spMembers(people, siteKey, e.name) : ''}</div>`).join('');
+}
+
+function personaCell(person, siteKey, entries) {
+  if (!entries) return '<td class="no">?</td>';
+  const { best, unknownSp } = personaAccess(person, siteKey, entries);
+  if (best) return `<td class="yes">✔ <span class="role r${best.rank}">${esc(best.role)}</span><div class="via">${KIND_ICON[best.kind]} ${esc(best.name)}</div></td>`;
+  return `<td class="no">—${unknownSp ? '<div class="via" title="The ingestion app has no grant on this site, so SharePoint group membership can\'t be read">site groups not readable</div>' : ''}</td>`;
+}
+
+async function loadAccess() {
+  $('#accessMeta').innerHTML = '<span class="spinner"></span> Reading SharePoint through Microsoft Graph with your token…';
+  const started = performance.now();
+  try {
+    const [people, searchHits, sites] = await Promise.all([
+      me?.isAdmin ? api('/api/admin/people').then((r) => r.people).catch(() => null) : null,
+      Promise.all(cfg.sites.flatMap((s) => s.folders.map((f) =>
+        api('/api/search', { q: `"${f.codeword}"`, mode: 'keyword', top: 1 }).then((r) => [f.codeword, r.count > 0]).catch(() => [f.codeword, null])))),
+      Promise.all(cfg.sites.map(async (s) => {
+        const u = new URL(s.url);
+        const site = await graphRead(`/sites/${u.hostname}:${u.pathname}?$select=id,webUrl,displayName`);
+        const out = { ...s, siteStatus: site.status, webUrl: site.body.webUrl ?? s.url, folders: [] };
+        let driveId = null;
+        let libUrl = `${s.url}/Shared%20Documents`;
+        if (site.ok) {
+          const drive = await graphRead(`/sites/${site.body.id}/drive?$select=id,webUrl`);
+          if (drive.ok) { driveId = drive.body.id; libUrl = drive.body.webUrl; }
+          const root = driveId ? await graphRead(`/drives/${driveId}/root?$select=id`) : null;
+          const rp = root?.ok ? await graphRead(`/drives/${driveId}/items/${root.body.id}/permissions`) : null;
+          // Readers get 200 with an empty list: only people who can manage permissions see them.
+          out.entries = rp?.ok && rp.body.value?.length ? permEntries(rp.body.value) : null;
+          out.permStatus = rp?.status;
+        }
+        out.folders = await Promise.all(s.folders.map(async (f) => {
+          const fo = { ...f, url: `${libUrl}/${encodeURIComponent(f.name)}` };
+          if (!driveId) return { ...fo, status: site.status };
+          const item = await graphRead(`/drives/${driveId}/root:/${encodeURIComponent(f.name)}?$select=id,webUrl,folder`);
+          fo.status = item.status;
+          if (!item.ok) return fo;
+          fo.url = item.body.webUrl;
+          fo.count = item.body.folder?.childCount;
+          const p = await graphRead(`/drives/${driveId}/items/${item.body.id}/permissions`);
+          fo.permStatus = p.status;
+          if (p.ok && p.body.value?.length) {
+            fo.entries = permEntries(p.body.value);
+            fo.unique = !fo.entries.some((e) => e.inherited);
+          }
+          return fo;
+        }));
+        return out;
+      })),
+    ]);
+    const hits = Object.fromEntries(searchHits);
+    const personaHead = people ? people.map((p) => `<th>${esc(p.displayName.split(' ')[0])}<br><small class="muted">${esc(p.upn.split('@')[0])}</small></th>`).join('') : '';
+    const you = (status, count) => (status === 200
+      ? `<td class="yes">✔ can open${count != null ? `<div class="via">${count} item(s)</div>` : ''}</td>`
+      : `<td class="no">⛔ <span class="muted">${status === 403 ? 'access denied' : status === 404 ? 'not visible' : `HTTP ${status}`}</span></td>`);
+    const noPerms = (status) => `<span class="muted small">${status === 200 || status === 403 || status === 401 ? '🔒 only site owners can see the permission list' : status === 404 ? '—' : status ? `permissions: HTTP ${status}` : '—'}</span>`;
+
+    const rows = sites.map((s) => {
+      const siteRow = `
+        <tr class="site-row">
+          <td><a href="${esc(s.webUrl)}" target="_blank" rel="noopener"><b>${esc(s.name)}</b> ↗</a>
+            <div class="muted small">${esc(new URL(s.url).pathname)}</div>
+            <div>${s.granted ? '<span class="pill ok">indexed · Sites.Selected read</span>' : '<span class="pill bad">not indexed · no Sites.Selected grant</span>'}</div></td>
+          <td><span class="scope site">Site</span></td>
+          <td class="granted">${s.entries ? grantedHtml(s.entries, people, s.key) : noPerms(s.permStatus ?? s.siteStatus)}</td>
+          ${people ? people.map((p) => personaCell(p, s.key, s.entries)).join('') : ''}
+          ${you(s.siteStatus)}
+          <td class="no">—</td>
+        </tr>`;
+      const folderRows = s.folders.map((f) => {
+        const scope = f.entries ? (f.unique ? '<span class="scope unique">Unique</span>' : '<span class="scope inh">Inherits from site</span>') : '<span class="muted">—</span>';
+        const granted = f.entries ? (f.unique ? grantedHtml(f.entries, people, s.key) : '<span class="muted small">same as site</span>') : noPerms(f.permStatus ?? f.status);
+        const hit = hits[f.codeword];
+        const search = !s.granted ? '<td class="no">⛔ <span class="muted">not indexed</span></td>'
+          : hit == null ? '<td class="no">?</td>'
+          : hit ? '<td class="yes">🔎 found</td>' : '<td class="no">🔒 hidden</td>';
+        return `
+          <tr>
+            <td class="folder"><a href="${esc(f.url)}" target="_blank" rel="noopener">📁 ${esc(f.name)} ↗</a> <span class="cw">${esc(f.codeword)}</span></td>
+            <td>${scope}</td>
+            <td class="granted">${granted}</td>
+            ${people ? people.map((p) => personaCell(p, s.key, f.entries ?? null)).join('') : ''}
+            ${you(f.status, f.count)}
+            ${search}
+          </tr>`;
+      }).join('');
+      return siteRow + folderRows;
+    }).join('');
+    $('#accessTable').innerHTML = `
+      <tr><th>SharePoint site / folder</th><th>Scope</th><th>Granted to (level)</th>${personaHead}<th>You · SharePoint</th><th>You · search</th></tr>${rows}`;
+    $('#accessMeta').innerHTML = `Read live ${new Date().toLocaleTimeString()} in ${Math.round(performance.now() - started)} ms as
+      <b>${esc(currentAccount()?.username ?? '')}</b>${people ? ' · persona columns computed from these permissions + live Entra and SharePoint group membership' : ''}.
+      <i>You · SharePoint</i> and <i>You · search</i> should agree — except HR, which is readable but never indexed.`;
+  } catch (e) {
+    $('#accessMeta').innerHTML = `<span class="warn-text">${esc(e.message)}</span>`;
+  }
+}
+
 // ---------- admin ----------
 async function loadAdmin() {
   loadIndexers();
@@ -544,6 +695,7 @@ async function boot() {
     toast('Copied JSON');
   }));
   $('#matrixRefresh').onclick = renderMatrix;
+  $('#accessRefresh').onclick = loadAccess;
   $('#ixRefresh').onclick = loadIndexers;
   $('#adminSearchForm').onsubmit = (e) => { e.preventDefault(); adminSearch(); };
 

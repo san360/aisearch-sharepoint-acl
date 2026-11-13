@@ -19,9 +19,12 @@ export const config = {
     demoUsers: e('GROUP_DEMO_USERS_ID'),
   },
   sites: [
-    { key: 'research', name: 'Research', url: e('SITE_RESEARCH_URL'), granted: true },
-    { key: 'finance', name: 'Finance', url: e('SITE_FINANCE_URL'), granted: true },
-    { key: 'hr', name: 'HR Confidential', url: e('SITE_HR_URL'), granted: false },
+    { key: 'research', name: 'ACL Demo - Research', url: e('SITE_RESEARCH_URL'), granted: true,
+      folders: [{ name: 'Public', codeword: 'BLUEBIRD' }, { name: 'Quantum', codeword: 'AURORA' }, { name: 'Bio', codeword: 'KESTREL' }] },
+    { key: 'finance', name: 'ACL Demo - Finance', url: e('SITE_FINANCE_URL'), granted: true,
+      folders: [{ name: 'Reports', codeword: 'NIGHTJAR' }] },
+    { key: 'hr', name: 'ACL Demo - HR Confidential', url: e('SITE_HR_URL'), granted: false,
+      folders: [{ name: 'Confidential', codeword: 'OSPREY' }] },
   ],
   runningInAzure: Boolean(process.env.CONTAINER_APP_NAME || process.env.IDENTITY_ENDPOINT),
 };
@@ -37,8 +40,9 @@ export function publicConfig() {
     clientId: config.webClientId,
     searchScope: 'https://search.azure.com/user_impersonation',
     graphAdminScope: 'https://graph.microsoft.com/GroupMember.ReadWrite.All',
+    graphReadScopes: ['https://graph.microsoft.com/Files.Read.All', 'https://graph.microsoft.com/Sites.Read.All'],
     groups: config.groups,
-    sites: config.sites.map(({ key, name, url, granted }) => ({ key, name, url, granted })),
+    sites: config.sites.map(({ key, name, url, granted, folders }) => ({ key, name, url, granted, folders })),
     indexName: config.indexName,
     runningInAzure: config.runningInAzure,
   };

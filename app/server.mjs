@@ -6,7 +6,7 @@ import { requireUser, requireAdmin } from './src/auth.mjs';
 import { searchAsUser, searchApi, indexerStatus, indexerDefinition, indexStats } from './src/search.mjs';
 import { chat } from './src/chat.mjs';
 import { proof } from './src/proof.mjs';
-import { liveMatrix } from './src/matrix.mjs';
+import { liveMatrix, peopleAccessContext } from './src/matrix.mjs';
 import { userGroups, isAdmin, resolvePrincipals } from './src/graph.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -73,6 +73,8 @@ admin.post('/search', wrap(async (req, res) => {
   const ids = data.results.flatMap((r) => [...r.userIds, ...r.groupIds]);
   res.json({ ...data, principals: await resolvePrincipals(ids) });
 }));
+
+admin.get('/people', wrap(async (_req, res) => res.json({ people: await peopleAccessContext() })));
 
 admin.get('/indexers', wrap(async (_req, res) => {
   const items = await Promise.all(config.sites.map(async (s) => ({

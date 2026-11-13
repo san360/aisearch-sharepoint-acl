@@ -192,6 +192,22 @@ main { max-width: 1180px; margin: 0 auto; padding: 28px; }
 .badge.match { color: var(--ok); border-color: rgba(34, 197, 94, 0.45); }
 .badge.vec { color: var(--warn); border-color: rgba(245, 158, 11, 0.45); }
 .result.neighbour { opacity: 0.72; }
+.table-wrap { overflow-x: auto; }
+.matrix.access td, .matrix.access th { vertical-align: top; }
+.matrix.access .site-row td { background: rgba(255, 255, 255, 0.03); border-top: 2px solid var(--line); }
+.matrix.access td.folder { padding-left: 30px; }
+.matrix.access td.granted { text-align: left; font-size: 0.8rem; }
+.matrix.access a { text-decoration: none; }
+.grant { white-space: nowrap; margin: 2px 0; }
+.role { font-size: 0.7rem; padding: 0 6px; border-radius: 999px; border: 1px solid var(--line); margin-left: 4px; color: var(--muted); }
+.role.r3 { color: #c4b5fd; border-color: rgba(139, 92, 246, 0.5); }
+.role.r2 { color: #fcd34d; border-color: rgba(245, 158, 11, 0.5); }
+.role.r1 { color: #86efac; border-color: rgba(34, 197, 94, 0.45); }
+.scope { font-size: 0.72rem; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.scope.site { background: rgba(59, 130, 246, 0.18); color: #93c5fd; }
+.scope.inh { background: rgba(148, 160, 198, 0.15); color: var(--muted); }
+.scope.unique { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+.cw { font-size: 0.68rem; color: var(--muted); letter-spacing: 0.05em; margin-left: 6px; }
 .ask-bar { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
 .ask-bar .chips { margin: 0; }
 .ask-bar #newChat { white-space: nowrap; flex-shrink: 0; }

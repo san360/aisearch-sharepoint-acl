@@ -131,7 +131,9 @@ resource ingestSharePointConsent 'Microsoft.Graph/appRoleAssignedTo@v1.0' = [for
 }]
 
 // ---------- 2. Web app (end-user sign-in, SPA + PKCE) ----------
-var webGraphScopes = ['openid', 'profile', 'offline_access', 'User.Read']
+// Files.Read.All + Sites.Read.All (delegated): the Access tab reads SharePoint folders and their permissions with the
+// signed-in user's own token, so each user only sees what SharePoint already lets them see.
+var webGraphScopes = ['openid', 'profile', 'offline_access', 'User.Read', 'Files.Read.All', 'Sites.Read.All']
 var webAdminGraphScopes = ['GroupMember.ReadWrite.All']
 
 resource webApp 'Microsoft.Graph/applications@v1.0' = {
