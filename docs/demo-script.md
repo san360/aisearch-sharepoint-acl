@@ -117,6 +117,98 @@ returns the nearest chunks you can access.
 * **Who can see what** (elevated read): every chunk with its stored `UserIds` / `GroupIds` resolved to names.
 * **Indexers**: status, schedule, **Run now**, **Resync ACLs** (needed after site/library/folder permission changes).
 
+## 7. More queries: paper-specific and complex
+
+All expectations below were checked against the live index with elevated read. Alice can read **Public + Quantum**, Bob
+**Public + Reports**, Carol **Public + Bio**. Nobody gets HR. Use **Keyword** mode unless stated otherwise, and open
+*Raw request & response* to show the query that was sent.
+
+### The papers
+
+| Short name | Paper (arXiv) | SharePoint site / folder |
+|---|---|---|
+| **Chunk boundaries** | Calibrating Document-Local Boundaries for Contextual Chunk Retrieval (2611.12097) | ACL Demo - Research / `Public` |
+| **Semantic IDs** | Not All Branches Are Equal — Adaptive Semantic ID Construction for Generative Recommendation (2611.11549) | ACL Demo - Research / `Public` |
+| **Jet identification** | Beauty and charm jet identification … on a superconducting quantum processor (2611.16607) | ACL Demo - Research / `Quantum` |
+| **Gatemon qubits** | Gatemon qubits based on in-situ ternary InAsSb-Al nanowire Josephson junctions (2611.16595) | ACL Demo - Research / `Quantum` |
+| **Gene → image** | Understanding Gene Expression-to-Image Learning (2610.17699) | ACL Demo - Research / `Bio` |
+| **CloneOT** | CloneOT — clone-specific perturbation responses with neural inverse optimal transport (2610.16093) | ACL Demo - Research / `Bio` |
+| **Credit behaviour PD** | A Functional Representation of Credit Behavior for Probability of Default Modeling (2610.07888) | ACL Demo - Finance / `Reports` |
+| **LGD credit cards** | Comparing two approaches for modelling the loss given default of credit cards (2610.05926) | ACL Demo - Finance / `Reports` |
+| **Owning What Can Quit** | Owning What Can Quit (2611.02302) | ACL Demo - HR Confidential / `Confidential` (never indexed) |
+
+### 7a. Paper-specific (one paper each)
+
+| Query | Finds | Alice | Bob | Carol |
+|---|---|---|---|---|
+| `"semantic ID"` | Semantic IDs | ✅ | ✅ | ✅ |
+| `"chunk retrieval"` | Chunk boundaries | ✅ | ✅ | ✅ |
+| `gatemon` | Gatemon qubits | ✅ | 🔒 | 🔒 |
+| `InAsSb` | Gatemon qubits | ✅ | 🔒 | 🔒 |
+| `"jet identification"` | Jet identification | ✅ | 🔒 | 🔒 |
+| `lineage` | CloneOT | 🔒 | 🔒 | ✅ |
+| `"gene expression"` | Gene → image (+ a few CloneOT chunks) | 🔒 | 🔒 | ✅ |
+| `"run-off triangles"` | LGD credit cards | 🔒 | ✅ | 🔒 |
+| `"probability of default"` | Credit behaviour PD (+ 1 LGD chunk) | 🔒 | ✅ | 🔒 |
+| `"Owning What Can Quit"` | — (HR, never indexed) | 🔒 | 🔒 | 🔒 |
+
+### 7b. Same query, different answers (terms in several folders)
+
+| Query | Indexed in | Alice sees | Bob sees | Carol sees |
+|---|---|---|---|---|
+| `"neural network"` | Quantum, Bio, Reports | Jet identification | Credit behaviour PD, LGD credit cards | CloneOT, Gene → image |
+| `calibration` | Public, Quantum, Reports | Chunk boundaries, Jet identification, Gatemon qubits | Chunk boundaries, Credit behaviour PD | Chunk boundaries |
+| `recommendation` | Public, Quantum, Reports | Semantic IDs, Gatemon qubits | Semantic IDs, LGD credit cards | Semantic IDs |
+| `boundaries` | Public, Quantum, Bio | Chunk boundaries, Semantic IDs, Jet identification | Chunk boundaries, Semantic IDs | Chunk boundaries, Semantic IDs, Gene → image |
+| `regression` | Bio, Reports | 🔒 nothing | Both Finance papers | Both Bio papers |
+| `transformer` | Public, Bio | Semantic IDs, Chunk boundaries | Semantic IDs, Chunk boundaries | Semantic IDs, Chunk boundaries, Gene → image |
+| `codeword` | every access note (+ Semantic IDs) | Public + Quantum notes | Public + Reports notes | Public + Bio notes |
+
+### 7c. Query syntax (simple query syntax, the app's default)
+
+| Query | What it does | Alice | Bob | Carol |
+|---|---|---|---|---|
+| `BLUEBIRD \| AURORA \| KESTREL \| NIGHTJAR \| OSPREY` | OR across all codewords | Public, Quantum notes | Public, Reports notes | Public, Bio notes |
+| `BLUEBIRD + AURORA` | AND: no note has both | 🔒 | 🔒 | 🔒 |
+| `gatemon \| "gene expression" \| "probability of default"` | OR of three phrases from three folders | Gatemon qubits | Credit behaviour PD, LGD credit cards | Gene → image, CloneOT |
+| `"optimal transport" \| "jet identification" \| "semantic ID"` | OR across Public, Quantum, Bio | Semantic IDs, Jet identification | Semantic IDs | Semantic IDs, CloneOT, Gene → image |
+| `+neural +credit` | AND (both required) | 🔒 | Both Finance papers | 🔒 |
+| `+neural +lineage` | AND | 🔒 | 🔒 | CloneOT |
+| `+regression +spatial` | AND | 🔒 | 🔒 | Gene → image |
+| `+calibration +retrieval` | AND | Chunk boundaries | Chunk boundaries | Chunk boundaries |
+| `qubit*` / `Josephson*` | prefix | Both Quantum papers | 🔒 | 🔒 |
+| `transcript*` | prefix | 🔒 | 🔒 | Both Bio papers |
+
+> **Gotcha:** `-` (NOT) in the default `searchMode=any` means "OR NOT". `quantum -qubit` therefore matches almost every
+> chunk (≈ 330 before trimming). Use `+` for required terms instead.
+
+### 7d. Natural-language questions (Semantic or Hybrid)
+
+In **Hybrid**, check the *keyword match* / *vector neighbour only* badges: a persona without access gets neighbours from their
+own folders, never the protected paper.
+
+| Query | Alice | Bob | Carol |
+|---|---|---|---|
+| `how are superconducting qubits fabricated from nanowires` | Gatemon qubits first | Only Public/Reports neighbours | Only Public/Bio neighbours |
+| `predicting how cell clones respond to perturbations` | Only Public/Quantum neighbours | Only Public/Reports neighbours | CloneOT first |
+| `estimating credit card losses after default` | Only Public/Quantum neighbours | LGD credit cards first | Only Public/Bio neighbours |
+| `where should a document be split into chunks for retrieval` | Chunk boundaries first | Chunk boundaries first | Chunk boundaries first |
+
+### 7e. Ask tab (RAG)
+
+| Question | Alice | Bob | Carol |
+|---|---|---|---|
+| *What is a gatemon qubit and which material is the junction made of?* | Answers from Gatemon qubits (InAsSb-Al nanowire) | "Not in my sources" | "Not in my sources" |
+| *Which flavours of jets are identified, and on what hardware?* | Beauty and charm, superconducting quantum processor | No access | No access |
+| *What does CloneOT predict and how is it trained?* | No access | No access | Clone-specific perturbation responses, lineage supervision |
+| *Compare run-off triangles and regression for loss given default.* | No access | Answers from LGD credit cards | No access |
+| *How do semantic IDs improve generative recommendation?* | Answers (Public) | Answers (Public) | Answers (Public) |
+| *Which of my documents use neural networks, and for what?* | Jet identification (+ Public) | Finance papers (+ Public) | Bio papers (+ Public) |
+| *Summarise everything I can access in one paragraph per folder.* | Public, Quantum | Public, Reports | Public, Bio |
+| *Is there anything about who owns what can quit?* | Nothing (HR not indexed) | Nothing | Nothing |
+
+Use **New conversation** between personas' scenarios so earlier answers don't leak context into the next question.
+
 ## REST version
 
 [`demo/queries.http`](../demo/queries.http) runs the same queries with the VS Code REST Client so you can show the raw

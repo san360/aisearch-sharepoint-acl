@@ -18,12 +18,20 @@ const SUGGESTED_SEARCHES = [
   { q: 'gene expression images', hint: 'Bio papers', mode: 'hybrid' },
   { q: 'probability of default credit cards', hint: 'Finance papers', mode: 'hybrid' },
   { q: 'chunk retrieval boundaries', hint: 'Public papers', mode: 'hybrid' },
+  { q: '"neural network"', hint: 'different paper per persona', mode: 'keyword' },
+  { q: 'gatemon | "gene expression" | "probability of default"', hint: 'OR across 3 folders', mode: 'keyword' },
+  { q: '+neural +credit', hint: 'AND (Finance only)', mode: 'keyword' },
+  { q: 'qubit*', hint: 'prefix (Quantum only)', mode: 'keyword' },
+  { q: 'predicting how cell clones respond to perturbations', hint: 'CloneOT (Bio)', mode: 'hybrid' },
 ];
 const SUGGESTED_QUESTIONS = [
   'Which codewords can I see, and which folders do they belong to?',
   'What does the superconducting quantum processor paper achieve?',
   'How do the finance papers model loss given default?',
   'Summarise the gene expression to image learning paper.',
+  'What is a gatemon qubit and which material is the junction made of?',
+  'What does CloneOT predict and how is it trained?',
+  'Which of my documents use neural networks, and for what?',
 ];
 const MATRIX = {
   cols: [

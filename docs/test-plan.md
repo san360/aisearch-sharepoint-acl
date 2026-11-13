@@ -44,6 +44,9 @@ result *keyword match* or *vector neighbour only*, and shows a banner when no ac
 | S9 | `probability of default credit cards` | Hybrid | never D11/D12 | D11/D12 ranked first | never D11/D12 |
 | S10 | `*` | Keyword | only documents from D1–D6 (first 20 chunks) | only D1–D3, D10–D12 | only D1–D3, D7–D9 |
 
+More paper-specific, cross-folder and query-syntax prompts (OR, AND, phrase, prefix) with expected results per persona:
+[demo-script.md § 7](demo-script.md#7-more-queries-paper-specific-and-complex).
+
 ## 3. Ask tab (ACL-trimmed RAG)
 
 | # | Prompt | Alice | Bob | Carol |
