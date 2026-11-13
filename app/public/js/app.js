@@ -14,6 +14,10 @@ const SUGGESTED_SEARCHES = [
   { q: 'KESTREL', hint: 'Research/Bio codeword', mode: 'keyword' },
   { q: 'NIGHTJAR', hint: 'Finance codeword', mode: 'keyword' },
   { q: 'OSPREY', hint: 'HR codeword (never indexed)', mode: 'keyword' },
+  { q: 'WREN', hint: 'Research › Archive library (all libraries)', mode: 'keyword' },
+  { q: 'HERON', hint: 'LLM Lab subsite / Papers', mode: 'keyword' },
+  { q: 'MAGPIE', hint: 'LLM Lab subsite / Drafts (Bob only)', mode: 'keyword' },
+  { q: 'large language models software engineering', hint: 'LLM Lab papers', mode: 'hybrid' },
   { q: 'superconducting qubits', hint: 'Quantum papers', mode: 'hybrid' },
   { q: 'gene expression images', hint: 'Bio papers', mode: 'hybrid' },
   { q: 'probability of default credit cards', hint: 'Finance papers', mode: 'hybrid' },
@@ -32,19 +36,23 @@ const SUGGESTED_QUESTIONS = [
   'What is a gatemon qubit and which material is the junction made of?',
   'What does CloneOT predict and how is it trained?',
   'Which of my documents use neural networks, and for what?',
+  'How are large language models reshaping software engineering research?',
 ];
 const MATRIX = {
   cols: [
     ['Research / Public', 'BLUEBIRD'],
     ['Research / Quantum', 'AURORA'],
     ['Research / Bio', 'KESTREL'],
+    ['Research / Archive library', 'WREN'],
+    ['LLM Lab subsite / Papers', 'HERON'],
+    ['LLM Lab subsite / Drafts', 'MAGPIE'],
     ['Finance / Reports', 'NIGHTJAR'],
     ['HR / Confidential', 'OSPREY'],
   ],
   rows: [
-    ['alice', 'Alice — Quantum team (Entra group)', [1, 1, 0, 0, 0]],
-    ['bob', 'Bob — Finance “Members” (SharePoint site group)', [1, 0, 0, 1, 0]],
-    ['carol', 'Carol — shared directly on Bio', [1, 0, 1, 0, 0]],
+    ['alice', 'Alice — Quantum team (Entra group)', [1, 1, 0, 1, 1, 0, 0, 0]],
+    ['bob', 'Bob — Finance “Members” (SharePoint site group)', [1, 0, 0, 1, 1, 1, 1, 0]],
+    ['carol', 'Carol — shared directly on Bio', [1, 0, 1, 1, 0, 0, 0, 0]],
   ],
 };
 
@@ -64,8 +72,8 @@ function toast(msg, isError = false) {
   t._timer = setTimeout(() => t.classList.add('hidden'), 5000);
 }
 function siteKey(url = '') {
-  const u = url.toLowerCase();
-  return u.endsWith('-research') ? 'research' : u.endsWith('-finance') ? 'finance' : u.endsWith('-hr') ? 'hr' : 'other';
+  const u = url.toLowerCase().replace(/\/+$/, '');
+  return u.endsWith('/llmlab') ? 'llmlab' : u.endsWith('-research') ? 'research' : u.endsWith('-finance') ? 'finance' : u.endsWith('-hr') ? 'hr' : 'other';
 }
 function siteName(url) {
   return cfg.sites.find((s) => s.key === siteKey(url))?.name ?? url;
@@ -340,11 +348,37 @@ async function loadProof() {
           ${p?.items ? `<div class="okbox">Visible to the app: ${p.items.map(esc).join(', ')}</div>` : ''}
           ${p?.error ? `<div class="errbox">Graph: ${esc(p.error)}</div>` : ''}
           ${ix.error ? `<div class="errbox">Indexer: ${esc(ix.error.slice(0, 400))}</div>` : ''}
+          ${me?.isAdmin ? `<div class="grants" data-site="${esc(s.url)}"><span class="muted small">Reading app grants…</span></div>` : ''}
         </div>`;
     }).join('');
+    if (me?.isAdmin) loadSiteGrants();
   } catch (e) {
     $('#proofCards').innerHTML = `<div class="errbox">${esc(e.message)}</div>`;
   }
+}
+
+// Admins: the actual Sites.Selected grants on each site (GET /sites/{id}/permissions, delegated Sites.FullControl.All).
+// SharePoint's own UI doesn't show these app grants anywhere.
+async function loadSiteGrants() {
+  let token;
+  try {
+    token = await getToken([cfg.graphSiteGrantsScope]);
+  } catch (e) {
+    $$('.grants').forEach((g) => (g.innerHTML = `<span class="muted small">App grants unavailable: ${esc(e.message)}</span>`));
+    return;
+  }
+  await Promise.all($$('.grants').map(async (box) => {
+    const u = new URL(box.dataset.site);
+    const call = (p) => fetch(`https://graph.microsoft.com/v1.0${p}`, { headers: { Authorization: `Bearer ${token}` } }).then(async (r) => ({ ok: r.ok, status: r.status, body: await r.json().catch(() => ({})) }));
+    const site = await call(`/sites/${u.hostname}:${u.pathname}?$select=id`);
+    const perms = site.ok ? await call(`/sites/${site.body.id}/permissions`) : site;
+    if (!perms.ok) { box.innerHTML = `<span class="muted small">App grants: HTTP ${perms.status}</span>`; return; }
+    const apps = perms.body.value.flatMap((p) => [...(p.grantedToIdentitiesV2 ?? p.grantedToIdentities ?? [])]
+      .filter((g) => g.application).map((g) => ({ name: g.application.displayName, id: g.application.id, roles: p.roles ?? [] })));
+    box.innerHTML = `<div class="small"><b>Sites.Selected grants</b> <span class="muted">(GET /sites/{id}/permissions)</span></div>${apps.length
+      ? apps.map((a) => `<div class="grant">🔑 ${esc(a.name ?? a.id)} <span class="role r1">${esc(a.roles.join(', '))}</span><div class="muted small"><code>${esc(a.id)}</code></div></div>`).join('')
+      : '<div class="warn-text small">none — no app has been granted this site</div>'}`;
+  }));
 }
 
 // ---------- how ----------
@@ -369,15 +403,18 @@ async function renderMatrix() {
   try {
     const data = await api('/api/matrix');
     const head = data.columns.map((c) => `
-      <th>${esc(c.siteName)} / ${esc(c.folder)}<br><small class="muted">${esc(c.codeword)}</small>
-        <div class="acl">${c.indexed === undefined
+      <th>${esc(c.siteName)} / ${c.library ? `${esc(c.library)} / ` : ''}${esc(c.folder)}<br><small class="muted">${esc(c.codeword)}</small>
+        <div class="acl">${c.available === false
+          ? '<span class="warn-text">subsite not created (tenant setting)</span>'
+          : c.indexed === undefined
           ? (c.granted ? '' : '<span class="warn-text">no Sites.Selected grant</span>')
           : c.indexed
           ? esc(c.principals.join(' · '))
           : `<span class="warn-text">not indexed${c.granted ? '' : ' — no Sites.Selected grant'}</span>`}</div></th>`).join('');
     const rows = data.rows.map((r) => {
       const design = designRow(r.upn);
-      const matches = design ? r.cells.every((c, i) => c.access === Boolean(design[2][i])) : null;
+      // Columns for a subsite that doesn't exist yet are left out of the comparison.
+      const matches = design ? r.cells.every((c, i) => data.columns[i].available === false || c.access === Boolean(design[2][i])) : null;
       const notes = [
         design ? (matches ? '<span class="pill ok">matches design</span>' : '<span class="pill bad">differs from design</span>') : '',
         r.notInSiteList.length ? `<span class="pill bad" title="Azure AI Search looks every user up in each indexed site; queries fail until the user is in the site's user list">⚠ not in user list: ${esc(r.notInSiteList.join(', '))}</span>` : '',
@@ -483,28 +520,36 @@ async function loadAccess() {
         api('/api/search', { q: `"${f.codeword}"`, mode: 'keyword', top: 1 }).then((r) => [f.codeword, r.count > 0]).catch(() => [f.codeword, null])))),
       Promise.all(cfg.sites.map(async (s) => {
         const u = new URL(s.url);
-        const site = await graphRead(`/sites/${u.hostname}:${u.pathname}?$select=id,webUrl,displayName`);
-        const out = { ...s, siteStatus: site.status, webUrl: site.body.webUrl ?? s.url, folders: [] };
-        let driveId = null;
-        let libUrl = `${s.url}/Shared%20Documents`;
+        let site = await graphRead(`/sites/${u.hostname}:${u.pathname}?$select=id,webUrl,displayName`);
+        // A subsite that doesn't exist may resolve to its parent: treat a different URL as "not found".
+        if (site.ok && site.body.webUrl?.toLowerCase().replace(/\/+$/, '') !== s.url.toLowerCase().replace(/\/+$/, '')) site = { ok: false, status: 404, body: {} };
+        const out = { ...s, siteStatus: site.status, webUrl: site.body.webUrl ?? s.url, missing: s.parent && site.status === 404, folders: [] };
+        let defaultDrive = null;
+        let drives = [];
         if (site.ok) {
-          const drive = await graphRead(`/sites/${site.body.id}/drive?$select=id,webUrl`);
-          if (drive.ok) { driveId = drive.body.id; libUrl = drive.body.webUrl; }
-          const root = driveId ? await graphRead(`/drives/${driveId}/root?$select=id`) : null;
-          const rp = root?.ok ? await graphRead(`/drives/${driveId}/items/${root.body.id}/permissions`) : null;
+          const [drive, all] = await Promise.all([
+            graphRead(`/sites/${site.body.id}/drive?$select=id,webUrl,name`),
+            graphRead(`/sites/${site.body.id}/drives?$select=id,webUrl,name`),
+          ]);
+          if (drive.ok) defaultDrive = drive.body;
+          drives = all.ok ? all.body.value : [];
+          const root = defaultDrive ? await graphRead(`/drives/${defaultDrive.id}/root?$select=id`) : null;
+          const rp = root?.ok ? await graphRead(`/drives/${defaultDrive.id}/items/${root.body.id}/permissions`) : null;
           // Readers get 200 with an empty list: only people who can manage permissions see them.
           out.entries = rp?.ok && rp.body.value?.length ? permEntries(rp.body.value) : null;
           out.permStatus = rp?.status;
         }
         out.folders = await Promise.all(s.folders.map(async (f) => {
-          const fo = { ...f, url: `${libUrl}/${encodeURIComponent(f.name)}` };
-          if (!driveId) return { ...fo, status: site.status };
-          const item = await graphRead(`/drives/${driveId}/root:/${encodeURIComponent(f.name)}?$select=id,webUrl,folder`);
+          const drive = f.library ? drives.find((d) => d.name === f.library) : defaultDrive;
+          const libUrl = drive?.webUrl ?? `${s.url}/${f.library ? encodeURIComponent(f.library) : 'Shared%20Documents'}`;
+          const fo = { ...f, url: `${libUrl}/${encodeURIComponent(f.name)}`, libraryName: drive?.name ?? f.library ?? 'Documents' };
+          if (!drive) return { ...fo, status: site.ok ? 404 : site.status };
+          const item = await graphRead(`/drives/${drive.id}/root:/${encodeURIComponent(f.name)}?$select=id,webUrl,folder`);
           fo.status = item.status;
           if (!item.ok) return fo;
           fo.url = item.body.webUrl;
           fo.count = item.body.folder?.childCount;
-          const p = await graphRead(`/drives/${driveId}/items/${item.body.id}/permissions`);
+          const p = await graphRead(`/drives/${drive.id}/items/${item.body.id}/permissions`);
           fo.permStatus = p.status;
           if (p.ok && p.body.value?.length) {
             fo.entries = permEntries(p.body.value);
@@ -523,30 +568,36 @@ async function loadAccess() {
     const noPerms = (status) => `<span class="muted small">${status === 200 || status === 403 || status === 401 ? '🔒 only site owners can see the permission list' : status === 404 ? '—' : status ? `permissions: HTTP ${status}` : '—'}</span>`;
 
     const rows = sites.map((s) => {
+      const gk = s.parent ?? s.key; // SharePoint groups belong to the site collection
+      const badge = s.missing
+        ? '<span class="pill bad">subsite not created — enable subsite creation for the tenant, then re-run setup</span>'
+        : s.parent ? `<span class="pill ok">indexed via the ${esc(cfg.sites.find((x) => x.key === s.parent)?.name ?? s.parent)} data source (includeSubsites)</span>`
+        : s.granted ? '<span class="pill ok">indexed · Sites.Selected read</span>' : '<span class="pill bad">not indexed · no Sites.Selected grant</span>';
       const siteRow = `
-        <tr class="site-row">
-          <td><a href="${esc(s.webUrl)}" target="_blank" rel="noopener"><b>${esc(s.name)}</b> ↗</a>
+        <tr class="site-row${s.parent ? ' subsite-row' : ''}">
+          <td>${s.parent ? '↳ ' : ''}<a href="${esc(s.webUrl)}" target="_blank" rel="noopener"><b>${esc(s.name)}</b> ↗</a>
             <div class="muted small">${esc(new URL(s.url).pathname)}</div>
-            <div>${s.granted ? '<span class="pill ok">indexed · Sites.Selected read</span>' : '<span class="pill bad">not indexed · no Sites.Selected grant</span>'}</div></td>
-          <td><span class="scope site">Site</span></td>
-          <td class="granted">${s.entries ? grantedHtml(s.entries, people, s.key) : noPerms(s.permStatus ?? s.siteStatus)}</td>
-          ${people ? people.map((p) => personaCell(p, s.key, s.entries)).join('') : ''}
+            <div>${badge}</div></td>
+          <td><span class="scope site">${s.parent ? 'Subsite' : 'Site'}</span></td>
+          <td class="granted">${s.entries ? grantedHtml(s.entries, people, gk) : noPerms(s.permStatus ?? s.siteStatus)}</td>
+          ${people ? people.map((p) => personaCell(p, gk, s.entries)).join('') : ''}
           ${you(s.siteStatus)}
           <td class="no">—</td>
         </tr>`;
       const folderRows = s.folders.map((f) => {
-        const scope = f.entries ? (f.unique ? '<span class="scope unique">Unique</span>' : '<span class="scope inh">Inherits from site</span>') : '<span class="muted">—</span>';
-        const granted = f.entries ? (f.unique ? grantedHtml(f.entries, people, s.key) : '<span class="muted small">same as site</span>') : noPerms(f.permStatus ?? f.status);
+        const scope = f.entries ? (f.unique ? '<span class="scope unique">Unique</span>' : `<span class="scope inh">Inherits from ${s.parent ? 'subsite' : 'site'}</span>`) : '<span class="muted">—</span>';
+        const granted = f.entries ? (f.unique ? grantedHtml(f.entries, people, gk) : `<span class="muted small">same as ${s.parent ? 'subsite' : 'site'}</span>`) : noPerms(f.permStatus ?? f.status);
         const hit = hits[f.codeword];
         const search = !s.granted ? '<td class="no">⛔ <span class="muted">not indexed</span></td>'
+          : s.missing ? '<td class="no">—</td>'
           : hit == null ? '<td class="no">?</td>'
           : hit ? '<td class="yes">🔎 found</td>' : '<td class="no">🔒 hidden</td>';
         return `
           <tr>
-            <td class="folder"><a href="${esc(f.url)}" target="_blank" rel="noopener">📁 ${esc(f.name)} ↗</a> <span class="cw">${esc(f.codeword)}</span></td>
+            <td class="folder"><a href="${esc(f.url)}" target="_blank" rel="noopener">${f.library ? `📚 ${esc(f.libraryName)} › ` : ''}📁 ${esc(f.name)} ↗</a> <span class="cw">${esc(f.codeword)}</span></td>
             <td>${scope}</td>
             <td class="granted">${granted}</td>
-            ${people ? people.map((p) => personaCell(p, s.key, f.entries ?? null)).join('') : ''}
+            ${people ? people.map((p) => personaCell(p, gk, f.entries ?? null)).join('') : ''}
             ${you(f.status, f.count)}
             ${search}
           </tr>`;

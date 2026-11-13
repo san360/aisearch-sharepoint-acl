@@ -56,8 +56,19 @@ export async function setupSearch({ runAndWait = true } = {}) {
 
   const created = [];
   for (const key of Object.keys(SITES)) {
-    const vars = { SITE_KEY: key, SITE_URL: env(`SITE_${key.toUpperCase()}_URL`) };
+    const vars = {
+      SITE_KEY: key,
+      SITE_URL: env(`SITE_${key.toUpperCase()}_URL`),
+      CONTAINER_JSON: JSON.stringify(SITES[key].container ?? { name: 'defaultSiteLibrary', query: null }),
+    };
+    const prev = await search(`datasources('ds-${key}')`).catch(() => null);
     await put(`datasources('ds-${key}')`, template('datasource', vars));
+    // A different container means a different set of items: re-crawl from scratch.
+    const next = JSON.parse(vars.CONTAINER_JSON);
+    if (prev && (prev.container?.name !== next.name || (prev.container?.query ?? null) !== (next.query ?? null))) {
+      log.info(`ds-${key}: container changed (${prev.container?.name} -> ${next.name}${next.query ? ` ${next.query}` : ''}); resetting ixr-${key}`);
+      await search(`indexers('ixr-${key}')/search.reset`, { method: 'POST' }).catch(() => {});
+    }
     try {
       await put(`indexers('ixr-${key}')`, template('indexer', vars));
       log.ok(`data source ds-${key} + indexer ixr-${key} (schedule ${process.env.INDEXER_SCHEDULE})`);
@@ -77,10 +88,16 @@ export async function setupSearch({ runAndWait = true } = {}) {
   if (!runAndWait) return;
   const triggered = Date.now() - 60_000;
   for (const key of created) {
-    try {
-      await search(`indexers('ixr-${key}')/search.run`, { method: 'POST' });
-    } catch (e) {
-      if (!(e instanceof HttpError) || e.status !== 409) throw e; // 409: already running
+    // 409 = the indexer is busy (e.g. just reset or on its schedule): retry so this run really starts.
+    for (let i = 0; ; i++) {
+      try {
+        await search(`indexers('ixr-${key}')/search.run`, { method: 'POST' });
+        break;
+      } catch (e) {
+        if (!(e instanceof HttpError) || e.status !== 409) throw e;
+        if (i >= 20) { log.warn(`ixr-${key}: still busy, not triggering another run`); break; }
+        await sleep(15000);
+      }
     }
   }
   await waitForIndexers(created, 20, triggered);

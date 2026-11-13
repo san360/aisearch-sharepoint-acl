@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
-import { config, publicConfig, missingConfig } from './src/config.mjs';
+import { config, publicConfig, missingConfig, collections } from './src/config.mjs';
 import { requireUser, requireAdmin } from './src/auth.mjs';
 import { searchAsUser, searchApi, indexerStatus, indexerDefinition, indexStats } from './src/search.mjs';
 import { chat } from './src/chat.mjs';
@@ -77,7 +77,7 @@ admin.post('/search', wrap(async (req, res) => {
 admin.get('/people', wrap(async (_req, res) => res.json({ people: await peopleAccessContext() })));
 
 admin.get('/indexers', wrap(async (_req, res) => {
-  const items = await Promise.all(config.sites.map(async (s) => ({
+  const items = await Promise.all(collections().map(async (s) => ({
     ...s,
     ...(await indexerStatus(s.key)),
     schedule: await indexerDefinition(s.key).then((d) => d.schedule).catch(() => null),
@@ -88,7 +88,7 @@ admin.get('/indexers', wrap(async (_req, res) => {
 
 admin.post('/indexers/:key/:action', wrap(async (req, res) => {
   const { key, action } = req.params;
-  if (!config.sites.some((s) => s.key === key)) return res.status(404).json({ error: 'unknown indexer' });
+  if (!collections().some((s) => s.key === key)) return res.status(404).json({ error: 'unknown indexer' });
   if (action === 'run') await searchApi(`indexers('ixr-${key}')/search.run`, { method: 'POST' });
   else if (action === 'resync') await searchApi(`indexers('ixr-${key}')/search.resync`, { method: 'POST', body: { options: ['permissions'] } });
   else return res.status(400).json({ error: 'action must be run or resync' });

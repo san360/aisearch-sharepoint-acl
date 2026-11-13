@@ -47,15 +47,16 @@
 ## Scope: site collection, site, library or folder
 
 * **`Sites.Selected` is granted per site collection** (`/sites/{id}/permissions`). A grant covers that site collection,
-  including its subsites. The granular `Lists.SelectedOperations.Selected`, `ListItems.SelectedOperations.Selected` and
-  `Files.SelectedOperations.Selected` permissions exist in Graph, but the indexer documentation doesn't list them and
-  they weren't tested here.
-* **What gets indexed** can be narrower or wider than one site, independent of the grant. The data source points at a
-  site URL and `container.name` selects `defaultSiteLibrary`, `allSiteLibraries` (add `includeSubsites=true` for subsites),
-  or `useQuery` with `includeLibrariesInSite=<site or subsite URL>`, `includeLibrary=` / `excludeLibrary=`,
-  `includeFolder=` / `excludeFolder=` (recursive). So you can index one subsite, one library or one folder while the
-  grant stays at site-collection level.
+  including its subsites (validated with the LLM Lab subsite). The granular `Lists.SelectedOperations.Selected`,
+  `ListItems.SelectedOperations.Selected` and `Files.SelectedOperations.Selected` permissions exist in Graph, but the
+  indexer documentation doesn't list them and they weren't tested here.
+* **What gets indexed** is chosen by the data source container (`defaultSiteLibrary`, `allSiteLibraries`,
+  `includeSubsites=true`, `useQuery` with `includeLibrariesInSite` / `includeLibrary` / `excludeLibrary` /
+  `includeFolder` / `excludeFolder`). Every option was tested — see [indexing-scopes.md](indexing-scopes.md). The
+  indexer's container query doesn't accept **KQL** (rejected); KQL filtering exists only on the remote SharePoint
+  knowledge source.
 * **Permissions are always per item**: whatever the scope, each chunk carries its own document's users/groups.
+* **Subsites need a tenant setting** that has no API: subsite creation is disabled by default in new tenants.
 
 ## <a id="filesreadall"></a>`Files.Read.All`
 
@@ -95,3 +96,6 @@ real browser; queries ran through the web app with the user's token. Detailed pr
 | Users not in an indexed site's user list | Whole query fails with 404 "User cannot be found" (see [above](#site-user-list)) — fixed by `ensureuser` |
 | Index schema | A field named `metadata_spo_item_path` is required; the `sharepointSiteUrl` field must be **filterable**, otherwise every write fails ("Unable to complete aggregations search request") |
 | Temporary Access Pass | Issuance returns 400 for a few minutes after the method is enabled (the script retries) |
+| `allSiteLibraries` + `includeSubsites=true` on the Research data source | Full crawl indexed the default library **and** the second *Archive* library (WREN visible to all three personas); per-container results in [indexing-scopes.md](indexing-scopes.md) |
+| KQL in the data source container query | Rejected at creation (*Unexpected keyword … in query property*) |
+| Subsite creation | Blocked by the tenant default; enabling it is UI-only |

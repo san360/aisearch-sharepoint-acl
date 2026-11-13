@@ -208,6 +208,8 @@ main { max-width: 1180px; margin: 0 auto; padding: 28px; }
 .scope.inh { background: rgba(148, 160, 198, 0.15); color: var(--muted); }
 .scope.unique { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
 .cw { font-size: 0.68rem; color: var(--muted); letter-spacing: 0.05em; margin-left: 6px; }
+.grants { margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--line); }
+.matrix.access .subsite-row td:first-child { padding-left: 18px; }
 .ask-bar { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
 .ask-bar .chips { margin: 0; }
 .ask-bar #newChat { white-space: nowrap; flex-shrink: 0; }

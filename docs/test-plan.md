@@ -21,6 +21,14 @@ persona must (✅) or must not (⛔) see, with the SharePoint permission that ex
 | D12 | Finance / Reports | Comparing two approaches for modelling the loss given default of credit cards | 2610.05926 | ⛔ | ✅ | ⛔ | same as D10 |
 | D13 | HR / Confidential | Access note - Confidential.md *(codeword OSPREY)* | – | ⛔ | ⛔ | ⛔ | All staff can read it **in SharePoint**, but the ingestion app has **no Sites.Selected grant** → never indexed |
 | D14 | HR / Confidential | Owning What Can Quit | 2611.02302 | ⛔ | ⛔ | ⛔ | same as D13 |
+| D15 | Research › **Archive** library / Notes | Access note - Notes.md *(codeword WREN)* | – | ✅ | ✅ | ✅ | Second library, inherits site (*All staff*). Only indexed with `allSiteLibraries` |
+| D16 | Research › **LLM Lab** subsite / Papers | Access note - Papers.md *(codeword HERON)* | – | ✅ | ✅ | ⛔ | Subsite with unique permissions: *Quantum team* group + Bob (direct) |
+| D17 | Research › LLM Lab / Papers | Shortcuts or Memorisation - Revisiting Data Corruption in NLU with LLMs | 2611.16843 | ✅ | ✅ | ⛔ | same as D16 |
+| D18 | Research › LLM Lab / Papers | Early Reflections on How LLMs are Reshaping Software Engineering Research | 2611.15797 | ✅ | ✅ | ⛔ | same as D16 |
+| D19 | Research › LLM Lab / Drafts | Access note - Drafts.md *(codeword MAGPIE)* | – | ⛔ | ✅ | ⛔ | Folder with unique permissions inside the subsite: Bob (direct) |
+| D20 | Research › LLM Lab / Drafts | DiFiT - Distribution-Fidelity-guided Visual Token Pruning for Multimodal LLMs | 2611.15069 | ⛔ | ✅ | ⛔ | same as D19 |
+
+D16–D20 need subsite creation enabled for the tenant ([indexing-scopes.md](indexing-scopes.md#subsites)).
 
 The deploying admin is the site owner of all three sites, so admin@ sees D1–D12 (never D13–D14).
 
@@ -38,6 +46,9 @@ result *keyword match* or *vector neighbour only*, and shows a banner when no ac
 | S3 | `KESTREL` | Keyword | 🔒 | 🔒 | D7 |
 | S4 | `NIGHTJAR` | Keyword | 🔒 | D10 | 🔒 |
 | S5 | `OSPREY` | Keyword | 🔒 | 🔒 | 🔒 |
+| S5a | `WREN` | Keyword | D15 | D15 | D15 |
+| S5b | `HERON` | Keyword | D16 | D16 | 🔒 |
+| S5c | `MAGPIE` | Keyword | 🔒 | D19 | 🔒 |
 | S6 | `BLUEBIRD AURORA KESTREL NIGHTJAR OSPREY` | Keyword | D1, D4 | D1, D10 | D1, D7 |
 | S7 | `superconducting qubits` | Hybrid | D5, D6 ranked first | **never** D5/D6 — only Public/Finance papers | **never** D5/D6 — only Public/Bio papers |
 | S8 | `gene expression images` | Hybrid | never D8/D9 | never D8/D9 | D8 ranked first |

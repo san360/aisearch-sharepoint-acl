@@ -1,4 +1,4 @@
-import { config } from './config.mjs';
+import { config, collections } from './config.mjs';
 import { ingestCredential } from './credentials.mjs';
 import { searchAsUser } from './search.mjs';
 import { groupMembers, userGroups, resolvePrincipals } from './graph.mjs';
@@ -8,11 +8,33 @@ export const COLUMNS = [
   { codeword: 'BLUEBIRD', site: 'research', folder: 'Public' },
   { codeword: 'AURORA', site: 'research', folder: 'Quantum' },
   { codeword: 'KESTREL', site: 'research', folder: 'Bio' },
+  { codeword: 'WREN', site: 'research', folder: 'Notes', library: 'Archive' },
+  { codeword: 'HERON', site: 'llmlab', folder: 'Papers' },
+  { codeword: 'MAGPIE', site: 'llmlab', folder: 'Drafts' },
   { codeword: 'NIGHTJAR', site: 'finance', folder: 'Reports' },
   { codeword: 'OSPREY', site: 'hr', folder: 'Confidential' },
 ];
 
 const normUrl = (u) => String(u ?? '').toLowerCase().replace(/\/+$/, '');
+
+// Subsites only exist once subsite creation is enabled for the tenant. Checked as the ingestion app
+// (its Sites.Selected grant on the site collection covers subsites); cached for 5 minutes.
+let subsiteCache = { at: 0, value: {} };
+export async function subsitesAvailable() {
+  if (Date.now() - subsiteCache.at < 300_000) return subsiteCache.value;
+  const value = {};
+  const cred = ingestCredential();
+  const token = cred ? (await cred.getToken('https://graph.microsoft.com/.default').catch(() => null))?.token : null;
+  await Promise.all(config.sites.filter((s) => s.parent && s.url).map(async (s) => {
+    if (!token) { value[s.key] = null; return; }
+    const u = new URL(s.url);
+    const res = await fetch(`https://graph.microsoft.com/v1.0/sites/${u.hostname}:${u.pathname}?$select=id,webUrl`, { headers: { Authorization: `Bearer ${token}` } });
+    // Graph resolves a missing subsite path to the parent site, so compare the returned URL.
+    value[s.key] = res.ok && normUrl((await res.json()).webUrl) === normUrl(s.url);
+  }));
+  subsiteCache = { at: Date.now(), value };
+  return value;
+}
 
 // The same call Azure AI Search makes to expand SharePoint site groups (spg:) at query time,
 // made here as the ingestion app (Sites.Selected, federated credential).
@@ -46,7 +68,9 @@ function evaluate(acl, who) {
   for (const id of acl.groupIds) {
     if (who.groups.has(id)) return { via: 'entra-group', label: who.groups.get(id) };
     const m = /^spg:(.+):(\d+)$/.exec(id);
-    const title = m && who.sp.get(normUrl(m[1]))?.get(Number(m[2]));
+    // SharePoint groups belong to the site collection; a subsite's spg: id may carry the subsite URL.
+    const key = m && [...who.sp.keys()].find((k) => normUrl(m[1]) === k || normUrl(m[1]).startsWith(`${k}/`));
+    const title = key && who.sp.get(key)?.get(Number(m[2]));
     if (title) return { via: 'sp-group', label: title };
   }
   return null;
@@ -55,7 +79,7 @@ function evaluate(acl, who) {
 // Personas (demo users group) with their transitive Entra groups and, for sites the ingestion app may read,
 // their SharePoint site groups. Sites without a grant report null (membership can't be read).
 export async function peopleAccessContext() {
-  const indexedSites = config.sites.filter((s) => s.granted && s.url);
+  const indexedSites = collections().filter((s) => s.granted && s.url);
   let spToken = null;
   try {
     spToken = (await ingestCredential()?.getToken(`https://${config.sharePointHost}/.default`))?.token ?? null;
@@ -79,12 +103,16 @@ export async function peopleAccessContext() {
 export async function liveMatrix(user, { admin = false } = {}) {
   const started = Date.now();
   const sites = new Map(config.sites.map((s) => [s.key, s]));
-  const indexedSites = config.sites.filter((s) => s.granted && s.url);
+  const indexedSites = collections().filter((s) => s.granted && s.url);
 
   // Ground truth for the signed-in user: the real ACL-trimmed query with their own token.
-  const mine = await Promise.all(COLUMNS.map((c) =>
-    searchAsUser(user.token, { q: `"${c.codeword}"`, mode: 'keyword', top: 1 })
-      .then((r) => r.count > 0).catch((e) => ({ error: e.message }))));
+  const [mine, subsites] = await Promise.all([
+    Promise.all(COLUMNS.map((c) =>
+      searchAsUser(user.token, { q: `"${c.codeword}"`, mode: 'keyword', top: 1 })
+        .then((r) => r.count > 0).catch((e) => ({ error: e.message })))),
+    subsitesAvailable().catch(() => ({})),
+  ]);
+  const available = (c) => subsites[c.site] !== false;
 
   // Reading the stored ACLs needs elevated read, which only admins have. Everyone else gets their own live row.
   if (!admin) {
@@ -92,7 +120,7 @@ export async function liveMatrix(user, { admin = false } = {}) {
       scope: 'self',
       generatedAt: new Date().toISOString(),
       tookMs: Date.now() - started,
-      columns: COLUMNS.map((c) => ({ ...c, siteName: sites.get(c.site)?.name ?? c.site, granted: sites.get(c.site)?.granted ?? false })),
+      columns: COLUMNS.map((c) => ({ ...c, siteName: sites.get(c.site)?.name ?? c.site, granted: sites.get(c.site)?.granted ?? false, available: available(c) })),
       rows: [{
         id: user.oid, upn: user.upn, displayName: user.name, me: true, notInSiteList: [], warnings: [],
         cells: mine.map((v) => ({ access: v === true, verified: v })),
@@ -120,6 +148,7 @@ export async function liveMatrix(user, { admin = false } = {}) {
       ...c,
       siteName: sites.get(c.site)?.name ?? c.site,
       granted: sites.get(c.site)?.granted ?? false,
+      available: available(c),
       indexed: data.results.length > 0,
       document: data.results[0]?.title ?? null,
       acl,

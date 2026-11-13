@@ -31,6 +31,14 @@ Only the Temporary Access Passes (time-limited) are written to `.azure/<env>/dem
 to the repository. Persona passwords are random, never shown and never stored. To use password + MFA instead, reset a
 persona's password in the Entra admin center and register an authentication method with the TAP.
 
+### Subsite creation (optional, LLM Lab subsite only)
+
+New tenants have subsite creation disabled ("New subsites are not available for your organization"). The setting has
+**no API or PowerShell**: SharePoint admin center → *Settings* → *classic settings page* (bottom) → *Subsite Creation* →
+**Enable subsite creation for all sites** → OK. It's tenant-wide (users can then create subsites from the UI). Without it,
+setup skips the LLM Lab subsite with a warning and everything else is deployed; enable it later and re-run
+`node scripts/setup/index.mjs --only sharepoint` then `--only search`.
+
 ## Azure
 
 | Requirement | Notes |

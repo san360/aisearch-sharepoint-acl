@@ -12,8 +12,9 @@ An end-to-end, `azd up`-deployable demo that **proves** SharePoint permissions f
 * **No secrets.** The indexer authenticates with a **federated identity credential** that trusts the search service's
   managed identity. Azure AI Search and Azure OpenAI have key auth disabled.
 * **Fully automated.** Entra apps, consent, federated credentials and groups (Microsoft Graph Bicep), Azure resources,
-  three SharePoint sites with folders and unique permissions, demo users, CC BY arXiv papers, the search pipeline and the
-  web app — one `azd up`.
+  three SharePoint site collections (plus a second library and a subsite) with folders and unique permissions, demo users,
+  CC BY arXiv papers, the search pipeline and the web app — one `azd up`. The only manual steps are the admin sign-ins
+  (MFA) and, for the subsite, a one-time tenant setting that has no API (see below).
 
 > The SharePoint in Microsoft 365 indexer and ACL ingestion are **preview** features (REST API `2026-08-01-preview`).
 > Not for production. For production RAG over SharePoint, also consider the remote SharePoint knowledge source
@@ -26,9 +27,9 @@ flowchart LR
   U[Alice / Bob / Carol] -- Entra sign-in (MSAL, PKCE) --> W[Web app<br/>Node.js + vanilla UI<br/>Container Apps]
   W -- "MI + x-ms-query-source-authorization (user token)" --> S[Azure AI Search<br/>chunks + vectors + ACLs]
   W -- grounded chat --> O[Azure OpenAI]
-  S -- "indexer · Sites.Selected · FIC" --> R[SharePoint: Research ✅]
+  S -- "indexer · Sites.Selected · FIC<br/>all libraries + subsites" --> R[SharePoint: Research ✅<br/>+ Archive library<br/>+ LLM Lab subsite]
   S -- "indexer · Sites.Selected · FIC" --> F[SharePoint: Finance ✅]
-  S -. "403 — no site grant" .-> H[SharePoint: HR ⛔]
+  S -. "indexer rejected — no site grant" .-> H[SharePoint: HR ⛔]
   S -- embeddings --> O
 ```
 
@@ -37,10 +38,14 @@ flowchart LR
 | Research / Public | *All staff* Entra group (site) | ✔ | ✔ | ✔ | BLUEBIRD |
 | Research / Quantum | *Quantum team* Entra group (unique) | ✔ | – | – | AURORA |
 | Research / Bio | Carol, direct share (unique) | – | – | ✔ | KESTREL |
+| Research › Archive library / Notes | *All staff* (site) — second library | ✔ | ✔ | ✔ | WREN |
+| Research › LLM Lab subsite / Papers | subsite unique: *Quantum team* + Bob | ✔ | ✔ | – | HERON |
+| Research › LLM Lab subsite / Drafts | Bob, direct (unique) | – | ✔ | – | MAGPIE |
 | Finance / Reports | SharePoint **Members** site group (Bob) | – | ✔ | – | NIGHTJAR |
 | HR / Confidential | *All staff* — but **no Sites.Selected grant** | – | – | – | OSPREY |
 
-Details: [docs/architecture.md](docs/architecture.md).
+Details: [docs/architecture.md](docs/architecture.md). Which libraries, folders and subsites get indexed with each
+data source setting (all tested): [docs/indexing-scopes.md](docs/indexing-scopes.md).
 
 ## Quick start
 
@@ -68,8 +73,9 @@ During `azd up`:
    *"high demand, prevents the creation of new search services"*) and discovers your SharePoint host name.
 2. **provision** deploys Azure resources and Entra objects (≈ 15 min, the search service takes ≈ 10).
 3. **postprovision** opens a browser **once** for the admin sign-in to the deployment-only *setup* app, then:
-   creates the personas (+ Temporary Access Passes), three communication sites, folders, unique permissions, uploads the
-   papers, grants `Sites.Selected` on Research and Finance only, creates the search pipeline and waits for the first runs.
+   creates the personas (+ Temporary Access Passes), three communication sites, a second library and a subsite in Research,
+   folders, unique permissions, uploads the papers, grants `Sites.Selected` on Research and Finance only, creates the
+   search pipeline and waits for the first runs.
 4. **deploy** builds the web app in Azure Container Registry and rolls it out.
 
 Open the URL printed at the end (`azd env get-value WEB_URL`). Persona sign-in details are in
@@ -89,7 +95,16 @@ Open the URL printed at the end (`azd env get-value WEB_URL`). Persona sign-in d
 node scripts/setup/index.mjs --only users        # re-issue Temporary Access Passes
 node scripts/setup/index.mjs --only sharepoint   # sites, content, permissions, grants (idempotent)
 node scripts/setup/index.mjs --only search       # index, skillset, data sources, indexers
+node scripts/setup/validate-scopes.mjs           # test which items each data source container setting indexes
 ```
+
+### What still needs a human
+
+| Step | Why |
+|---|---|
+| `azd auth login` as the tenant admin, and one browser sign-in for the *setup* app during postprovision | MFA / Conditional Access |
+| *Only for the LLM Lab subsite:* SharePoint admin center → Settings → *classic settings page* → Subsite Creation → **Enable subsite creation for all sites** | New tenants disable subsites and the setting has **no API or PowerShell**. Without it the setup prints these steps and skips the subsite; everything else deploys. Re-run `--only sharepoint` and `--only search` afterwards |
+| 3 free licences that include SharePoint | Personas must be able to open SharePoint (setup warns if none are free) |
 
 ### Local development
 
@@ -142,21 +157,26 @@ scripts/
   setup/steps/users.mjs       personas, licences, groups, Temporary Access Pass
   setup/steps/sharepoint.mjs  sites, papers, folder ACLs, site user lists, Sites.Selected grants
   setup/steps/search.mjs      index / skillset / data sources / indexers
+  setup/validate-scopes.mjs   test each data source container option against a scratch index
   setup/cleanup.mjs           remove what azd down doesn't (sites, users, apps, groups)
-  setup/content.json          sites, folders, codewords, arXiv paper IDs
+  setup/content.json          sites, libraries, subsites, folders, codewords, arXiv paper IDs, data source container
   search/*.json               search object templates
 app/                          web app (server.mjs, src/, public/)
 data/papers/                  CC BY 4.0 sample PDFs + ATTRIBUTION.md
 demo/queries.http             raw REST queries (no token / persona / elevated read)
-docs/                         architecture, prerequisites, frequency, proof, limitations, demo script, test plan
+docs/                         architecture, prerequisites, frequency, indexing scopes, proof, limitations, demo script, test plan
 ```
 
 ## Clean up
 
 ```powershell
-node scripts/setup/cleanup.mjs   # SharePoint sites, demo users, Entra apps and groups
-azd down --purge                 # Azure resources
+node scripts/setup/cleanup.mjs --purge   # SharePoint sites, demo users, Entra apps and groups (+ recycle bins)
+azd down --purge                         # Azure resources
 ```
+
+`--purge` also empties the SharePoint site recycle bin and Entra *deleted items* for these objects. Without it the site
+URLs (`/sites/acldemo-*`) stay reserved for 93 days and the next `azd up` stops with a message telling you to purge them
+or choose another prefix (`azd env set DEMO_PREFIX <name>`).
 
 If the setup script enabled the Temporary Access Pass method (it only does so when TAP was disabled), it is scoped to the
 demo personas group; disable it in the Entra admin center if you no longer need it.
@@ -172,7 +192,10 @@ see [docs/limitations.md](docs/limitations.md), which also records the validatio
 `Sites.Selected` is granted **per site collection**: the grant is the security boundary. What is indexed can be narrower —
 one subsite, one library or one folder — through the data source container query (`includeLibrariesInSite`,
 `includeLibrary`, `includeFolder`, `includeSubsites`…). Permissions are always ingested **per item**, so trimming works the
-same at any scope. Details: [limitations.md](docs/limitations.md#scope-site-collection-site-library-or-folder).
+same at any scope. This demo indexes Research with `allSiteLibraries` + `includeSubsites=true` (default library, a
+second *Archive* library and the *LLM Lab* subsite) through **one** grant and one indexer. Every container option —
+default library, all libraries, subsites, one library, folders, exclusions, and why KQL is rejected — is tested in
+[docs/indexing-scopes.md](docs/indexing-scopes.md).
 
 ## Prior art
 

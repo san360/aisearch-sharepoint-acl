@@ -1,5 +1,5 @@
 import { ingestCredential, decodeJwt } from './credentials.mjs';
-import { config } from './config.mjs';
+import { config, collections } from './config.mjs';
 import { indexerStatus } from './search.mjs';
 
 // Sites.Selected proof: call Microsoft Graph AS the ingestion app (app-only,
@@ -44,7 +44,8 @@ export async function proof() {
     tokenError = 'The live probe runs in Azure only (it uses the web app managed identity as a federated credential).';
   }
 
-  const sites = await Promise.all(config.sites.map(async (site) => ({
+  // Sites.Selected grants are per site collection; subsites are covered by their collection's grant.
+  const sites = await Promise.all(collections().map(async (site) => ({
     ...site,
     probe: token ? await probeSite(token, site).catch((e) => ({ error: e.message })) : null,
     indexer: await indexerStatus(site.key),

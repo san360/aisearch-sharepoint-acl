@@ -30,6 +30,47 @@
             { "id": "2610.16093", "title": "CloneOT - predicting clone-specific perturbation responses with lineage-supervised neural inverse optimal transport" }
           ]
         }
+      },
+      "$containerComment": "Index every document library of the root site AND its subsites (LLM Lab). The Sites.Selected grant is on the site collection, so it covers subsites too.",
+      "container": { "name": "allSiteLibraries", "query": "includeSubsites=true" },
+      "libraries": {
+        "Archive": {
+          "title": "ACL Demo - Research (Archive library)",
+          "description": "A second document library in the Research root site. Only indexed when the container is allSiteLibraries (or useQuery includeLibrary=...), never with defaultSiteLibrary.",
+          "folders": {
+            "Notes": {
+              "access": "Inherits site permissions: All staff group (Read). Lives in the second library 'Archive', not in 'Documents'.",
+              "codeword": "WREN",
+              "papers": []
+            }
+          }
+        }
+      },
+      "subsites": {
+        "llmlab": {
+          "title": "ACL Demo - LLM Lab",
+          "url": "llmlab",
+          "description": "Subsite of Research with unique permissions: Quantum team group + Bob (Read). Indexed through the Research data source (includeSubsites=true).",
+          "access": { "groups": ["GROUP_QUANTUM_ID"], "users": ["PERSONA_BOB_UPN"] },
+          "folders": {
+            "Papers": {
+              "access": "Inherits the subsite's unique permissions: Quantum team Entra group (Alice) and Bob (direct user), Read.",
+              "codeword": "HERON",
+              "papers": [
+                { "id": "2611.16843", "title": "Shortcuts or Memorisation - Revisiting Data Corruption in Natural Language Understanding with Large Language Models" },
+                { "id": "2611.15797", "title": "Early Reflections on How Large Language Models are Reshaping Software Engineering Research" }
+              ]
+            },
+            "Drafts": {
+              "access": "Unique permissions: Bob directly (Read) only.",
+              "codeword": "MAGPIE",
+              "restrictTo": { "users": ["PERSONA_BOB_UPN"] },
+              "papers": [
+                { "id": "2611.15069", "title": "DiFiT - Distribution-Fidelity-guided Visual Token Pruning for Multimodal Large Language Models" }
+              ]
+            }
+          }
+        }
       }
     },
     "finance": {

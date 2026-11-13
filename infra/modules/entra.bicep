@@ -134,7 +134,9 @@ resource ingestSharePointConsent 'Microsoft.Graph/appRoleAssignedTo@v1.0' = [for
 // Files.Read.All + Sites.Read.All (delegated): the Access tab reads SharePoint folders and their permissions with the
 // signed-in user's own token, so each user only sees what SharePoint already lets them see.
 var webGraphScopes = ['openid', 'profile', 'offline_access', 'User.Read', 'Files.Read.All', 'Sites.Read.All']
-var webAdminGraphScopes = ['GroupMember.ReadWrite.All']
+// Sites.FullControl.All (delegated, deploying admin only): read the Sites.Selected app grants per site
+// (GET /sites/{id}/permissions) in the Proof tab. Still bounded by the admin's own SharePoint rights.
+var webAdminGraphScopes = ['GroupMember.ReadWrite.All', 'Sites.FullControl.All']
 
 resource webApp 'Microsoft.Graph/applications@v1.0' = {
   uniqueName: '${namePrefix}-web'

@@ -18,6 +18,13 @@ async function ensureSite(key, def, adminUpn) {
   let status = await siteStatus(host, url);
   if (status !== 2) {
     if (status !== 1) {
+      const adminHost = `https://${host.replace('.sharepoint.com', '-admin.sharepoint.com')}`;
+      const recycled = await spo(adminHost, 'SPO.Tenant/GetDeletedSitePropertiesByUrl', { method: 'POST', body: { siteUrl: url } }).then(() => true, () => false);
+      if (recycled) {
+        throw new Error(`${url} is in the SharePoint site recycle bin, so the URL can't be reused. Run `
+          + '`node scripts/setup/cleanup.mjs --purge` (or delete it from SharePoint admin center → Deleted sites), '
+          + 'or pick another prefix with `azd env set DEMO_PREFIX <name>`.');
+      }
       log.info(`creating communication site ${url}`);
       await spo(`https://${host}`, 'SPSiteManager/create', {
         method: 'POST',
@@ -60,7 +67,7 @@ async function ensureSite(key, def, adminUpn) {
 const papersDir = path.resolve('data', 'papers');
 const arxivHeaders = { 'User-Agent': 'aisearch-sharepoint-acl-demo (setup script)' };
 
-async function verifiedPaper(paper) {
+export async function verifiedPaper(paper) {
   fs.mkdirSync(papersDir, { recursive: true });
   const file = path.join(papersDir, `${paper.id}.pdf`);
   const meta = path.join(papersDir, `${paper.id}.json`);
@@ -164,28 +171,43 @@ function folderServerRelative(site, folder) {
   return decodeURIComponent(new URL(site.folders[folder].webUrl).pathname);
 }
 
-async function restrictFolder(site, folder, principalLogonNames) {
-  const url = site.url;
-  const item = `web/GetFolderByServerRelativePath(decodedurl='${folderServerRelative(site, folder).replace(/'/g, "''")}')/ListItemAllFields`;
-  const unique = (await spo(url, `${item}?$select=HasUniqueRoleAssignments`)).HasUniqueRoleAssignments;
+// Break inheritance on a web (subsite) or a list item (folder) and leave exactly: the site Owners group
+// (Full Control) + the given principals (Read).
+async function restrictScope(url, scope, principalLogonNames) {
+  const unique = (await spo(url, `${scope}?$select=HasUniqueRoleAssignments`)).HasUniqueRoleAssignments;
   if (!unique) {
-    await spo(url, `${item}/breakroleinheritance(copyRoleAssignments=false,clearSubscopes=true)`, { method: 'POST' });
+    await spo(url, `${scope}/breakroleinheritance(copyRoleAssignments=false,clearSubscopes=true)`, { method: 'POST' });
   }
   const reader = await roleDefId(url, 2);
   const admin = await roleDefId(url, 5);
   const owners = (await spo(url, 'web/associatedownergroup?$select=Id')).Id;
-  await spo(url, `${item}/roleassignments/addroleassignment(principalid=${owners},roledefid=${admin})`, { method: 'POST' });
+  await spo(url, `${scope}/roleassignments/addroleassignment(principalid=${owners},roledefid=${admin})`, { method: 'POST' });
+  const ids = [];
   for (const logon of principalLogonNames) {
     const pid = await ensureUserId(url, logon);
-    await spo(url, `${item}/roleassignments/addroleassignment(principalid=${pid},roledefid=${reader})`, { method: 'POST' });
+    ids.push(pid);
+    await spo(url, `${scope}/roleassignments/addroleassignment(principalid=${pid},roledefid=${reader})`, { method: 'POST' });
   }
-  // Remove anything else left over from earlier runs.
-  const keep = new Set([owners, ...(await Promise.all(principalLogonNames.map((l) => ensureUserId(url, l))))]);
-  for (const ra of (await spo(url, `${item}/roleassignments?$select=PrincipalId`)).value) {
+  // Remove anything else left over from earlier runs (including the creator added by breakroleinheritance).
+  const keep = new Set([owners, ...ids]);
+  for (const ra of (await spo(url, `${scope}/roleassignments?$select=PrincipalId`)).value) {
     if (!keep.has(ra.PrincipalId)) {
-      await spo(url, `${item}/roleassignments/getbyprincipalid(${ra.PrincipalId})`, { method: 'POST', headers: { 'X-HTTP-Method': 'DELETE' } });
+      await spo(url, `${scope}/roleassignments/getbyprincipalid(${ra.PrincipalId})`, { method: 'POST', headers: { 'X-HTTP-Method': 'DELETE' } });
     }
   }
+}
+
+async function restrictFolder(site, folder, principalLogonNames) {
+  const item = `web/GetFolderByServerRelativePath(decodedurl='${folderServerRelative(site, folder).replace(/'/g, "''")}')/ListItemAllFields`;
+  await restrictScope(site.url, item, principalLogonNames);
+}
+
+// "access": { "groups": ["GROUP_..._ID"], "users": ["PERSONA_..._UPN"] } -> SharePoint claims
+function principalsFrom(access = {}) {
+  return [
+    ...(access.groups ?? []).map((g) => groupClaim(env(g))),
+    ...(access.users ?? []).map((u) => userClaim(env(u))),
+  ];
 }
 
 async function grantWebRead(url, logonName) {
@@ -218,6 +240,70 @@ async function applyPermissions(sites) {
   // HR: everyone can read it in SharePoint, but the ingestion app is never granted.
   await grantWebRead(sites.hr.url, allStaff);
   log.ok('hr: All staff=Read on site (never granted to the ingestion app)');
+
+  // Subsites: unique permissions on the subsite (web), optionally a folder with its own unique permissions.
+  for (const sub of Object.values(sites).filter((s) => s.parentKey)) {
+    const def = SITES[sub.parentKey].subsites[sub.key];
+    await restrictScope(sub.url, 'web', principalsFrom(def.access));
+    for (const [folder, f] of Object.entries(def.folders)) {
+      if (f.restrictTo) await restrictFolder(sub, folder, principalsFrom(f.restrictTo));
+    }
+    log.ok(`${sub.key} (subsite of ${sub.parentKey}): unique permissions on the subsite; ${Object.entries(def.folders)
+      .map(([n, f]) => `${n} ${f.restrictTo ? 'unique' : 'inherits subsite'}`).join(', ')}`);
+  }
+}
+
+// ---------- Subsites ----------
+const SUBSITES_DISABLED = /New subsites are not available/i;
+
+// Additional document library in a site (not the default "Documents" library).
+async function ensureLibrary(site, name, def) {
+  const lists = (await spo(site.url, `web/lists?$select=Title,BaseTemplate&$filter=Title eq '${name.replace(/'/g, "''")}'`)).value;
+  if (!lists.length) {
+    await spo(site.url, 'web/lists', { method: 'POST', body: { Title: name, Description: def.description, BaseTemplate: 101 } });
+    log.ok(`${site.key}: document library '${name}' created`);
+  }
+  for (let i = 0; ; i++) {
+    const drive = (await graph(`/sites/${site.siteId}/drives?$select=id,name,webUrl`)).value.find((d) => d.name === name);
+    if (drive) return { ...site, key: `${site.key}/${name}`, driveId: drive.id, driveWebUrl: drive.webUrl, folders: undefined };
+    if (i > 12) throw new Error(`library ${name} not visible in Graph`);
+    await sleep(5000);
+  }
+}
+async function ensureSubsite(parent, key, def) {
+  const url = `${parent.url}/${def.url}`;
+  const serverRelative = new URL(url).pathname.toLowerCase();
+  const webs = (await spo(parent.url, 'web/webs?$select=ServerRelativeUrl')).value;
+  if (!webs.some((w) => w.ServerRelativeUrl.toLowerCase() === serverRelative)) {
+    log.info(`creating subsite ${url}`);
+    await spo(parent.url, 'web/webs/add', {
+      method: 'POST',
+      body: {
+        parameters: {
+          Title: def.title,
+          Url: def.url,
+          Description: def.description,
+          Language: 1033,
+          WebTemplate: 'STS#3',
+          UseSamePermissionsAsParentSite: true,
+        },
+      },
+    });
+    log.ok(`subsite ready: ${url}`);
+  } else {
+    log.info(`subsite exists: ${url}`);
+  }
+  const u = new URL(url);
+  for (let i = 0; ; i++) {
+    try {
+      const site = await graph(`/sites/${u.hostname}:${u.pathname}?$select=id,webUrl,displayName`);
+      const drive = await graph(`/sites/${site.id}/drive?$select=id,webUrl`);
+      return { key, url, parentKey: parent.key, siteId: site.id, driveId: drive.id, driveWebUrl: drive.webUrl };
+    } catch (e) {
+      if (i > 12) throw e;
+      await sleep(5000);
+    }
+  }
 }
 
 // Azure AI Search resolves SharePoint site groups (spg:) at query time by looking the signed-in user up in
@@ -269,9 +355,26 @@ export async function setupSharePoint() {
   for (const [key, def] of Object.entries(SITES)) {
     sites[key] = await ensureSite(key, def, me.userPrincipalName);
   }
+  for (const [parentKey, def] of Object.entries(SITES)) {
+    for (const [key, sub] of Object.entries(def.subsites ?? {})) {
+      try {
+        sites[key] = await ensureSubsite(sites[parentKey], key, sub);
+      } catch (e) {
+        if (!SUBSITES_DISABLED.test(String(e.body?.['odata.error']?.message?.value ?? e.message))) throw e;
+        log.warn(`subsite '${key}' skipped: subsite creation is disabled for this tenant.\n`
+          + '      Enable it once (UI only, no API): SharePoint admin center -> Settings -> "classic settings page" ->\n'
+          + '      Subsite Creation -> "Enable subsite creation for all sites" -> OK. Then re-run:\n'
+          + '      node scripts/setup/index.mjs --only sharepoint && node scripts/setup/index.mjs --only search');
+      }
+    }
+  }
 
   log.step('Sample content (CC BY arXiv papers + access notes)');
-  for (const [key, def] of Object.entries(SITES)) await uploadContent(sites[key], def);
+  for (const [key, def] of Object.entries(SITES)) {
+    await uploadContent(sites[key], def);
+    for (const [lib, ld] of Object.entries(def.libraries ?? {})) await uploadContent(await ensureLibrary(sites[key], lib, ld), ld);
+    for (const [subKey, sub] of Object.entries(def.subsites ?? {})) if (sites[subKey]) await uploadContent(sites[subKey], sub);
+  }
 
   log.step('SharePoint permissions');
   await applyPermissions(sites);

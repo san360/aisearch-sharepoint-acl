@@ -6,7 +6,7 @@
   "credentials": {
     "connectionString": "SharePointOnlineEndpoint=${SITE_URL};ApplicationId=${INGEST_APP_CLIENT_ID};FederatedCredentialApplicationId=${SEARCH_IDENTITY_CLIENT_ID};TenantId=${AZURE_TENANT_ID}"
   },
-  "container": { "name": "defaultSiteLibrary", "query": null },
+  "container": ${CONTAINER_JSON},
   "identity": {
     "@odata.type": "#Microsoft.Azure.Search.DataUserAssignedIdentity",
     "userAssignedIdentity": "${SEARCH_IDENTITY_RESOURCE_ID}"

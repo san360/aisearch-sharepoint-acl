@@ -20,7 +20,11 @@ export const config = {
   },
   sites: [
     { key: 'research', name: 'ACL Demo - Research', url: e('SITE_RESEARCH_URL'), granted: true,
-      folders: [{ name: 'Public', codeword: 'BLUEBIRD' }, { name: 'Quantum', codeword: 'AURORA' }, { name: 'Bio', codeword: 'KESTREL' }] },
+      folders: [{ name: 'Public', codeword: 'BLUEBIRD' }, { name: 'Quantum', codeword: 'AURORA' }, { name: 'Bio', codeword: 'KESTREL' },
+        { name: 'Notes', codeword: 'WREN', library: 'Archive' }] },
+    // Subsite of Research: same site collection, so the same Sites.Selected grant, data source and indexer.
+    { key: 'llmlab', name: 'ACL Demo - LLM Lab', parent: 'research', url: e('SITE_RESEARCH_URL') && `${e('SITE_RESEARCH_URL')}/llmlab`, granted: true,
+      folders: [{ name: 'Papers', codeword: 'HERON' }, { name: 'Drafts', codeword: 'MAGPIE' }] },
     { key: 'finance', name: 'ACL Demo - Finance', url: e('SITE_FINANCE_URL'), granted: true,
       folders: [{ name: 'Reports', codeword: 'NIGHTJAR' }] },
     { key: 'hr', name: 'ACL Demo - HR Confidential', url: e('SITE_HR_URL'), granted: false,
@@ -28,6 +32,8 @@ export const config = {
   ],
   runningInAzure: Boolean(process.env.CONTAINER_APP_NAME || process.env.IDENTITY_ENDPOINT),
 };
+
+export const collections = () => config.sites.filter((s) => !s.parent);
 
 const required = ['tenantId', 'webClientId', 'searchEndpoint', 'openAiEndpoint'];
 export function missingConfig() {
@@ -40,9 +46,10 @@ export function publicConfig() {
     clientId: config.webClientId,
     searchScope: 'https://search.azure.com/user_impersonation',
     graphAdminScope: 'https://graph.microsoft.com/GroupMember.ReadWrite.All',
+    graphSiteGrantsScope: 'https://graph.microsoft.com/Sites.FullControl.All',
     graphReadScopes: ['https://graph.microsoft.com/Files.Read.All', 'https://graph.microsoft.com/Sites.Read.All'],
     groups: config.groups,
-    sites: config.sites.map(({ key, name, url, granted, folders }) => ({ key, name, url, granted, folders })),
+    sites: config.sites.map(({ key, name, url, granted, folders, parent }) => ({ key, name, url, granted, folders, parent })),
     indexName: config.indexName,
     runningInAzure: config.runningInAzure,
   };

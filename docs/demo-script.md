@@ -6,16 +6,21 @@ The complete list of prompts and expected results per persona is in [test-plan.m
 
 ## Who has access to what (and at which level)
 
-### The three SharePoint sites
+### The SharePoint sites
 
-Each is a separate **site collection** (communication site). Folders live in the site's default *Documents* library
-(`Shared Documents`). `acldemo` is the default `DEMO_PREFIX`.
+Three **site collections** (communication sites), plus one **subsite** and one extra **document library** inside Research.
+Folders live in the default *Documents* library (`Shared Documents`) unless noted. `acldemo` is the default `DEMO_PREFIX`.
 
 | Site key | SharePoint site name | Site URL | Folders in *Documents* |
 |---|---|---|---|
-| Research | **ACL Demo - Research** | `https://<tenant>.sharepoint.com/sites/acldemo-research` | `Public`, `Quantum`, `Bio` |
+| Research | **ACL Demo - Research** | `https://<tenant>.sharepoint.com/sites/acldemo-research` | `Public`, `Quantum`, `Bio` · second library **Archive**: `Notes` |
+| ↳ LLM Lab (subsite of Research) | **ACL Demo - LLM Lab** | `https://<tenant>.sharepoint.com/sites/acldemo-research/llmlab` | `Papers`, `Drafts` |
 | Finance | **ACL Demo - Finance** | `https://<tenant>.sharepoint.com/sites/acldemo-finance` | `Reports` |
 | HR | **ACL Demo - HR Confidential** | `https://<tenant>.sharepoint.com/sites/acldemo-hr` | `Confidential` |
+
+> The LLM Lab **subsite** is only created when subsite creation is enabled for the tenant (one-time UI setting, see
+> [indexing-scopes.md](indexing-scopes.md#subsites)). Without it the setup skips the subsite and everything else works;
+> HERON and MAGPIE then show *subsite not created* in the app.
 
 Permissions are granted at two scopes:
 
@@ -31,6 +36,10 @@ Permissions are granted at two scopes:
 | ACL Demo - Research | `Public` | Site (inherited) | *All staff* | Inherits from the site | Read |
 | ACL Demo - Research | `Quantum` | **Folder (unique)** | *Quantum team* (Entra group: Alice) | Folder role assignment to an Entra group | Read |
 | ACL Demo - Research | `Bio` | **Folder (unique)** | Carol | Folder role assignment to a **user** (direct) | Read |
+| ACL Demo - Research | *Archive* library › `Notes` | Site (inherited) | *All staff* | Inherits from the site | Read |
+| ACL Demo - LLM Lab *(subsite)* | *(whole subsite)* | **Subsite (unique)** | *Quantum team* (Alice) + Bob | Subsite role assignments (inheritance from Research broken) | Read |
+| ACL Demo - LLM Lab *(subsite)* | `Papers` | Subsite (inherited) | *Quantum team* + Bob | Inherits from the subsite | Read |
+| ACL Demo - LLM Lab *(subsite)* | `Drafts` | **Folder (unique)** | Bob | Folder role assignment to a **user** (direct) | Read |
 | ACL Demo - Finance | *(whole site)* | **Site** | Bob | Member of the SharePoint **Members** site group | Edit (verified) |
 | ACL Demo - Finance | `Reports` | Site (inherited) | Bob | Inherits from the site (via *Members*) | Edit |
 | ACL Demo - HR Confidential | *(whole site)* | **Site** | *All staff* | Site role assignment | Read |
@@ -47,9 +56,12 @@ Rows are SharePoint locations; ✅ / ⛔ is what the persona can open **in Share
 | ACL Demo - Research | `Public` | BLUEBIRD | ✅ Site Read — *All staff* | ✅ Site Read — *All staff* | ✅ Site Read — *All staff* | ✅ Site Owner |
 | ACL Demo - Research | `Quantum` | AURORA | ✅ **Folder** Read — *Quantum team* group | ⛔ unique folder, not listed | ⛔ unique folder, not listed | ✅ Site Owner |
 | ACL Demo - Research | `Bio` | KESTREL | ⛔ unique folder, not listed | ⛔ unique folder, not listed | ✅ **Folder** Read — direct user | ✅ Site Owner |
+| ACL Demo - Research | *Archive* › `Notes` | WREN | ✅ Site Read — *All staff* | ✅ Site Read — *All staff* | ✅ Site Read — *All staff* | ✅ Site Owner |
+| ACL Demo - LLM Lab *(subsite)* | `Papers` | HERON | ✅ **Subsite** Read — *Quantum team* group | ✅ **Subsite** Read — direct user | ⛔ unique subsite, not listed | ✅ Site Owner |
+| ACL Demo - LLM Lab *(subsite)* | `Drafts` | MAGPIE | ⛔ unique folder, not listed | ✅ **Folder** Read — direct user | ⛔ unique subsite, not listed | ✅ Site Owner |
 | ACL Demo - Finance | `Reports` | NIGHTJAR | ⛔ no access to the site | ✅ Site Edit — SharePoint *Members* group | ⛔ no access to the site | ✅ Site Owner |
 | ACL Demo - HR Confidential | `Confidential` | OSPREY | ✅ Site Read — *All staff* | ✅ Site Read — *All staff* | ✅ Site Read — *All staff* | ✅ Site Owner |
-| **Visible in search** | | | BLUEBIRD, AURORA | BLUEBIRD, NIGHTJAR | BLUEBIRD, KESTREL | all except OSPREY |
+| **Visible in search** | | | BLUEBIRD, AURORA, WREN, HERON | BLUEBIRD, NIGHTJAR, WREN, HERON, MAGPIE | BLUEBIRD, KESTREL, WREN | all except OSPREY |
 
 OSPREY is readable by everyone in SharePoint but never appears in search: the HR site isn't granted to the ingestion app.
 
@@ -57,12 +69,12 @@ OSPREY is readable by everyone in SharePoint but never appears in search: the HR
 
 | SharePoint site | `Sites.Selected` grant | Result |
 |---|---|---|
-| ACL Demo - Research | `read` | Indexed with item-level ACLs (`ixr-research`) |
-| ACL Demo - Finance | `read` | Indexed with item-level ACLs (`ixr-finance`) |
+| ACL Demo - Research | `read` | Indexed with item-level ACLs (`ixr-research`, container `allSiteLibraries` + `includeSubsites=true`): Documents, the **Archive** library and the **LLM Lab subsite** — one grant on the site collection covers its subsites |
+| ACL Demo - Finance | `read` | Indexed with item-level ACLs (`ixr-finance`, `defaultSiteLibrary`) |
 | ACL Demo - HR Confidential | **none** | Graph returns 403. Azure AI Search refuses to create the indexer (`accessDenied`), so there are only **two** indexers. Everyone can read HR **in SharePoint**, yet OSPREY never appears in search |
 
 Each folder holds one *Access note* (with the codeword) and arXiv papers; documents inherit the folder's permissions. The
-full document list (D1–D14) is in [test-plan.md](test-plan.md#1-documents-and-who-can-read-them).
+full document list (D1–D20) is in [test-plan.md](test-plan.md#1-documents-and-who-can-read-them).
 
 ## 0. Set the scene (admin, *How it works* and *Access* tabs)
 
@@ -210,6 +222,34 @@ own folders, never the protected paper.
 | *Is there anything about who owns what can quit?* | Nothing (HR not indexed) | Nothing | Nothing |
 
 Use **New conversation** between personas' scenarios so earlier answers don't leak context into the next question.
+
+## 8. Libraries and subsites (one data source, whole site collection)
+
+The Research data source uses `allSiteLibraries` + `includeSubsites=true`, so one indexer covers the default library, the
+second **Archive** library and the **LLM Lab** subsite. All container options are tested in
+[indexing-scopes.md](indexing-scopes.md).
+
+| Query (Keyword) | Location | Alice | Bob | Carol |
+|---|---|---|---|---|
+| `WREN` | Research › Archive library / Notes | ✅ | ✅ | ✅ |
+| `HERON` | LLM Lab subsite / Papers | ✅ (Quantum team on the subsite) | ✅ (direct on the subsite) | 🔒 |
+| `MAGPIE` | LLM Lab subsite / Drafts (unique) | 🔒 | ✅ (direct on the folder) | 🔒 |
+| `"data corruption"` | LLM Lab / Papers paper | ✅ | ✅ | 🔒 |
+| `"token pruning"` | LLM Lab / Drafts paper (DiFiT) | 🔒 | ✅ | 🔒 |
+| `"software engineering research"` | LLM Lab / Papers paper | ✅ | ✅ | 🔒 |
+
+Talking points:
+
+1. With `defaultSiteLibrary` (scenario S1) WREN and the subsite would never be indexed — scope is a data source
+   decision, not a permission.
+2. The `Sites.Selected` grant on the **site collection** covers the subsite: no extra grant.
+3. Bob reaches the subsite through a **direct** subsite permission and MAGPIE through a **folder** permission; Alice
+   through an **Entra group** on the subsite; Carol has nothing there although she can read the parent site.
+4. In the **Access** tab, the subsite row is indented under Research and its folders show *Inherits from subsite* /
+   *Unique*.
+
+Ask tab: *How are large language models reshaping software engineering research?* — Alice and Bob get an answer from the
+LLM Lab paper; Carol gets "not in my sources".
 
 ## REST version
 
