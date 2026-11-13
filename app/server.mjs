@@ -6,6 +6,7 @@ import { requireUser, requireAdmin } from './src/auth.mjs';
 import { searchAsUser, searchApi, indexerStatus, indexerDefinition, indexStats } from './src/search.mjs';
 import { chat } from './src/chat.mjs';
 import { proof } from './src/proof.mjs';
+import { liveMatrix } from './src/matrix.mjs';
 import { userGroups, isAdmin, resolvePrincipals } from './src/graph.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -31,7 +32,7 @@ app.use(express.static(pub, { extensions: ['html'] }));
 
 const wrap = (fn) => (req, res) => Promise.resolve(fn(req, res)).catch((e) => {
   console.error(e);
-  res.status(e.status && e.status < 600 ? e.status : 500).json({ error: e.message });
+  res.status(e.status && e.status < 600 ? e.status : 500).json({ error: e.message, ...(e.raw ? { raw: e.raw } : {}) });
 });
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, missing: missingConfig() }));
@@ -47,7 +48,7 @@ app.get('/api/me', requireUser, wrap(async (req, res) => {
 
 app.post('/api/search', requireUser, wrap(async (req, res) => {
   const { q, mode = 'hybrid', top = 10 } = req.body ?? {};
-  res.json(await searchAsUser(req.user.token, { q, mode, top: Math.min(Number(top) || 10, 50) }));
+  res.json(await searchAsUser(req.user.token, { q, mode, top: Math.min(Number(top) || 10, 50), raw: true }));
 }));
 
 app.post('/api/chat', requireUser, wrap(async (req, res) => {
@@ -57,6 +58,10 @@ app.post('/api/chat', requireUser, wrap(async (req, res) => {
 }));
 
 app.get('/api/proof', requireUser, wrap(async (_req, res) => res.json(await proof())));
+
+// Live "who can see what": stored ACLs + live group resolution, plus a real trimmed query for the caller.
+app.get('/api/matrix', requireUser, wrap(async (req, res) =>
+  res.json(await liveMatrix(req.user, { admin: await isAdmin(req.user.oid).catch(() => false) }))));
 
 // ---------- Admin ----------
 const admin = express.Router();

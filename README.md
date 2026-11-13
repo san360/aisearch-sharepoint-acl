@@ -108,10 +108,10 @@ The live Sites.Selected probe only works in Azure (it uses the managed identity 
 
 | Tab | What it shows |
 |---|---|
-| **Search** | Keyword / semantic / hybrid search as the signed-in user; codeword chips; "No results for you" when everything matching is protected |
-| **Ask** | RAG chat; retrieval runs with the user's token, so the model only receives trimmed chunks; citations link back to SharePoint |
+| **Search** | Keyword / semantic / hybrid search as the signed-in user; codeword chips; "No results for you" when everything matching is protected; **raw request / response** JSON (tokens redacted) |
+| **Ask** | RAG chat; every question runs a new trimmed search with the user's token; citations link back to SharePoint; sample questions always visible; **New conversation** |
 | **Sites.Selected proof** | App-only Graph probe per site (200 vs 403), the token's `roles` claim, indexer status and errors |
-| **How it works** | Flow, the four mechanisms, the expected-results matrix (your row highlighted) |
+| **How it works** | Flow, the four mechanisms and a **live** who-can-see-what matrix: admins get every persona computed from the stored ACLs + live group resolution; everyone gets their own row confirmed by real trimmed queries |
 | **Admin** *(admins group)* | Elevated read: every chunk with its `UserIds`/`GroupIds` resolved to names · indexer status, **Run now**, **Resync ACLs** · live group-membership toggle |
 
 Stack: Node.js (Express 5), vanilla HTML/CSS/ES modules (no build step), MSAL Browser v5 (SPA + PKCE, redirect bridge),

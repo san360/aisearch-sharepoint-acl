@@ -16,6 +16,7 @@ export const config = {
     allStaff: e('GROUP_ALL_STAFF_ID'),
     quantum: e('GROUP_QUANTUM_ID'),
     admins: e('GROUP_ADMINS_ID'),
+    demoUsers: e('GROUP_DEMO_USERS_ID'),
   },
   sites: [
     { key: 'research', name: 'Research', url: e('SITE_RESEARCH_URL'), granted: true },

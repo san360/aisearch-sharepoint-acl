@@ -33,7 +33,8 @@ Content-Type: application/json
 { "search": "AURORA", "count": true, "select": "title,path" }
 
 ### 3. Elevated read (Search Index Data Contributor) -> everything, with the stored ACLs
-#    Note: x-ms-enable-elevated-read can't be combined with x-ms-query-source-authorization.
+#    Note: elevated read needs a USER token as Authorization (app-only tokens are rejected)
+#    and can't be combined with x-ms-query-source-authorization.
 POST {{endpoint}}/indexes/{{index}}/docs/search?api-version={{api}}
 Authorization: Bearer {{adminToken}}
 x-ms-enable-elevated-read: true

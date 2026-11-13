@@ -178,6 +178,32 @@ main { max-width: 1180px; margin: 0 auto; padding: 28px; }
 .matrix .yes { color: var(--ok); font-weight: 700; }
 .matrix .no { color: #64708f; }
 .matrix tr.me td { background: rgba(59, 130, 246, 0.08); }
+.matrix .acl { font-size: 0.72rem; color: var(--muted); font-weight: 400; margin-top: 4px; max-width: 190px; margin-inline: auto; }
+.matrix .via { font-size: 0.74rem; color: var(--muted); font-weight: 400; margin-top: 2px; }
+.matrix .live { font-size: 0.72rem; font-weight: 600; margin-top: 4px; }
+.matrix .live.ok { color: var(--ok); }
+.matrix .live.bad, .warn-text { color: var(--warn); }
+.pill { display: inline-block; font-size: 0.7rem; padding: 1px 8px; border-radius: 999px; margin: 4px 4px 0 0; border: 1px solid var(--line); }
+.pill.ok { color: var(--ok); border-color: rgba(34, 197, 94, 0.4); }
+.pill.bad { color: var(--warn); border-color: rgba(245, 158, 11, 0.5); }
+.matrix tr.design td { opacity: 0.6; }
+.ask-bar { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+.ask-bar .chips { margin: 0; }
+.ask-bar #newChat { white-space: nowrap; flex-shrink: 0; }
+.ask-bar #newChat:disabled { opacity: 0.45; cursor: default; }
+.raw { margin: 6px 0 16px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; }
+.raw summary { cursor: pointer; font-weight: 600; }
+.raw-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 1000px) { .raw-grid { grid-template-columns: 1fr; } }
+.raw-box { min-width: 0; }
+.raw-head { display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+pre.json { margin: 0; max-height: 520px; overflow: auto; background: #0a0f22; border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px; font: 12px/1.5 'Cascadia Code', Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+.j-key { color: #93c5fd; }
+.j-str { color: #a7f3d0; }
+.j-num { color: #fcd34d; }
+.j-lit { color: #f9a8d4; }
+#matrixMeta { margin: 4px 0 10px; }
 
 /* admin */
 .admin-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 16px; margin-bottom: 16px; }

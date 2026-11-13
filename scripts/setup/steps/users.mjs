@@ -10,6 +10,8 @@ export const PERSONAS = [
   { key: 'carol', displayName: 'Carol Biology', jobTitle: 'Biology researcher', groups: ['GROUP_ALL_STAFF_ID'] },
 ];
 
+// Entra requires an initial password. It is random, never displayed and never stored: personas sign in with a
+// Temporary Access Pass (or an admin resets the password in the Entra admin center).
 function password() {
   const sets = ['ABCDEFGHJKLMNPQRSTUVWXYZ', 'abcdefghijkmnopqrstuvwxyz', '23456789', '!@#%*-_+='];
   const all = sets.join('');
@@ -115,7 +117,6 @@ export async function ensureUsers({ issueTaps = env('DEMO_ISSUE_TAP', 'true') ==
         },
       });
       user.assignedLicenses = [];
-      credentials.set(upn, { password: pwd });
       log.ok(`created ${upn}`);
     }
     users[p.key] = { id: user.id, upn, displayName: p.displayName };
@@ -158,9 +159,9 @@ export async function ensureUsers({ issueTaps = env('DEMO_ISSUE_TAP', 'true') ==
   if (credentials.size) {
     const file = path.resolve('.azure', env('AZURE_ENV_NAME', 'local'), 'demo-credentials.txt');
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    const lines = [`# ${new Date().toISOString()} - local only, never commit`];
+    const lines = [`# ${new Date().toISOString()} - Temporary Access Passes, local only, never commit`];
     for (const [upn, cr] of credentials) {
-      lines.push([upn, cr.password && `password=${cr.password}`, cr.tap && `TAP=${cr.tap}`].filter(Boolean).join('\t'));
+      if (cr.tap) lines.push(`${upn}\tTAP=${cr.tap}`);
     }
     fs.appendFileSync(file, lines.join('\n') + '\n', { mode: 0o600 });
     log.ok(`Persona sign-in details written to ${path.relative(process.cwd(), file)} (gitignored)`);

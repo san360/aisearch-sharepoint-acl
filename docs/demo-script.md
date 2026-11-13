@@ -7,7 +7,14 @@ The complete list of prompts and expected results per persona is in [test-plan.m
 ## 0. Set the scene (admin, *How it works* tab)
 
 * Three SharePoint sites, five folders, five codewords.
-* The expected-results matrix shows what each persona should see.
+* The **live** who-can-see-what matrix is computed now, not hard-coded. Signed in as an admin, every persona's row comes
+  from the ACL stored on each access note plus live Entra and SharePoint group lookups, and each ✔ says why (👤 direct,
+  👥 Entra group, 🟦 SharePoint site group). HR shows *not indexed — no Sites.Selected grant*. Click **Re-run** after
+  changing a membership.
+* Signed in as a persona, only your own row is computed: each cell is confirmed by a real trimmed query with your token
+  (🔎 found / hidden).
+* In the Search tab, open **Raw request & response** to show the exact JSON sent to Azure AI Search
+  (`x-ms-query-source-authorization` header, `queryType`, `vectorQueries`) and the trimmed response.
 
 ## 1. Alice — Entra group access
 

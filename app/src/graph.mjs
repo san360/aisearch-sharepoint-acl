@@ -27,6 +27,12 @@ export async function userGroups(oid) {
   return res.value.map((g) => ({ id: g.id, name: g.displayName }));
 }
 
+export async function groupMembers(groupId) {
+  if (!groupId) return [];
+  const res = await graph(`/groups/${groupId}/members/microsoft.graph.user?$select=id,displayName,userPrincipalName&$top=50`);
+  return res.value.map((u) => ({ id: u.id, upn: u.userPrincipalName, displayName: u.displayName }));
+}
+
 export function isAdmin(oid) {
   return cached(`admin:${oid}`, 60_000, async () => {
     if (!config.groups.admins) return false;

@@ -52,8 +52,32 @@ access, so a "no access" result shows up as *other* documents rather than an emp
 | A4 | *Summarise the gene expression to image learning paper.* | No access | No access | Answer cites D8 |
 | A5 | *What is the HR codeword?* | No access (OSPREY never appears) | same | same |
 
-Each answer lists its sources with "N chunk(s) retrieved after ACL trimming". A persona never sees a citation to a
-document they can't open in SharePoint.
+Each answer lists its sources with "N chunk(s) retrieved after ACL trimming" and the search it ran. A persona never sees
+a citation to a document they can't open in SharePoint.
+
+| # | Check | Expected |
+|---|---|---|
+| A6 | Ask A2, then *New conversation* | Chat clears; sample questions stay visible; the next question has no earlier context |
+| A7 | Ask any question twice | Each answer shows "🔎 searched … as you": every question runs a new trimmed search, nothing is stored server-side |
+
+## 3b. Raw request and response (Search tab)
+
+| # | Prompt / mode | Expected in *Raw request & response* |
+|---|---|---|
+| R1 | `NIGHTJAR`, Keyword, as Alice | Request has `x-ms-query-source-authorization: <redacted>`, no `queryType`; response `"@odata.count": 0`, `"value": []` |
+| R2 | `NIGHTJAR`, Keyword, as Bob | Same request; response contains *Access note - Reports.md* |
+| R3 | `superconducting qubits`, Semantic | `"queryType": "semantic"`, `semanticConfiguration`, `captions`; response has `@search.rerankerScore` / `@search.captions` |
+| R4 | `superconducting qubits`, Hybrid | Semantic settings plus `vectorQueries: [{ "kind": "text", … }]` |
+
+Tokens are never echoed: `Authorization` and the user token are shown as `<… redacted>`.
+
+## 3c. Live who-can-see-what (How it works tab)
+
+| # | Signed in as | Expected |
+|---|---|---|
+| L1 | admin@ | One row per persona + you. Alice ✔ Public (👥 All staff) and Quantum (👥 Quantum team); Bob ✔ Public and Reports (🟦 Members); Carol ✔ Public and Bio (👤 direct); admin ✔ D1/D4/D7/D10 via 🟦 Owners. HR column: *not indexed — no Sites.Selected grant*. Persona rows show *matches design* |
+| L2 | admin@, after X3 (Carol added to Quantum team) → **Re-run** | Carol ✔ AURORA via 👥 Quantum team and *differs from design*; remove her → back to *matches design* |
+| L3 | a persona | Only your row is computed; every cell shows 🔎 found / hidden from a real trimmed query; other rows are labelled *design* |
 
 ## 4. Sites.Selected proof tab (any persona)
 
@@ -82,7 +106,7 @@ Token strip: roles claim = `Sites.Selected`, obtained with a federated credentia
 |---|---|---|
 | N1 | Call `/api/search` without a token | 401 |
 | N2 | Query the index with the app identity but **no** `x-ms-query-source-authorization` (`demo/queries.http` #1) | 0 results |
-| N3 | Send `x-ms-enable-elevated-read` together with a user token | 400: elevated read can't be combined with a user token |
+| N3 | Send `x-ms-enable-elevated-read` with the app's managed-identity token, or together with `x-ms-query-source-authorization` | Rejected: elevated read needs the caller's own user token and can't be combined with a query-source token |
 | N4 | Look at the PDFs' sharing links: an "Anyone"/"People in your organization" link is **not** honoured | Document remains hidden from users who only have the link |
 | N5 | Entra group nested inside a SharePoint group | Not expanded: users who reach a document only this way get no result |
 

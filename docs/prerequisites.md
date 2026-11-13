@@ -27,7 +27,9 @@ therefore issues a reusable **Temporary Access Pass** (TAP, default 8 hours) to 
 * Disable with `azd env set DEMO_ISSUE_TAP false`; change the lifetime with `DEMO_TAP_LIFETIME_MINUTES`.
 * Re-issue passes any time: `node scripts/setup/index.mjs --only users`.
 
-Passwords and passes are written to `.azure/<env>/demo-credentials.txt` (gitignored) — never to the repository.
+Only the Temporary Access Passes (time-limited) are written to `.azure/<env>/demo-credentials.txt` (gitignored) — never
+to the repository. Persona passwords are random, never shown and never stored. To use password + MFA instead, reset a
+persona's password in the Entra admin center and register an authentication method with the TAP.
 
 ## Azure
 

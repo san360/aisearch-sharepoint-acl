@@ -57,18 +57,31 @@
       </form>
       <div class="chips" id="suggestions"></div>
       <div class="result-meta" id="searchMeta"></div>
+      <details class="raw hidden" id="rawPanel">
+        <summary>Raw request &amp; response <span class="muted small" id="rawMeta"></span></summary>
+        <p class="muted small">Exactly what this app sent to Azure AI Search and what came back (tokens redacted). Trimming happens
+          inside the service: chunks you can't read are never in the response.</p>
+        <div class="raw-grid">
+          <div class="raw-box">
+            <div class="raw-head">Request <button type="button" class="btn small" data-copy="rawReq">Copy</button></div>
+            <pre class="json" id="rawReq"></pre>
+          </div>
+          <div class="raw-box">
+            <div class="raw-head">Response <button type="button" class="btn small" data-copy="rawRes">Copy</button></div>
+            <pre class="json" id="rawRes"></pre>
+          </div>
+        </div>
+      </details>
       <div id="results" class="results"></div>
     </section>
 
     <!-- Ask -->
     <section id="tab-ask" class="panel hidden">
-      <div class="chat" id="chatLog">
-        <div class="chat-empty">
-          <h3>Ask questions grounded in the documents <u>you</u> can read</h3>
-          <p class="muted">Retrieval uses your identity, so the model only ever receives ACL-trimmed chunks.</p>
-          <div class="chips" id="askSuggestions"></div>
-        </div>
+      <div class="ask-bar">
+        <div class="chips" id="askSuggestions"></div>
+        <button type="button" class="btn small" id="newChat" title="Clear this conversation (nothing is stored on the server)">＋ New conversation</button>
       </div>
+      <div class="chat" id="chatLog"></div>
       <form class="chat-input" id="chatForm">
         <input id="chatQ" placeholder="Ask a question…" autocomplete="off" />
         <button class="btn primary" type="submit">Ask</button>
@@ -136,7 +149,17 @@
           </ul>
         </div>
       </div>
-      <h3>Expected results</h3>
+      <div class="panel-head">
+        <div>
+          <h3>Who can see what — live</h3>
+          <p class="muted small">Computed now, not hard-coded: the ACL stored on each indexed access note (elevated read) is
+            matched against each persona's <b>Entra groups</b> (Microsoft Graph) and <b>SharePoint site groups</b> (looked up as the
+            ingestion app — the same lookup Azure AI Search does). Your own row is also confirmed by running the codeword
+            query with <b>your</b> token.</p>
+        </div>
+        <button class="btn" id="matrixRefresh">Re-run</button>
+      </div>
+      <div id="matrixMeta" class="muted small"></div>
       <table class="matrix" id="matrix"></table>
     </section>
 

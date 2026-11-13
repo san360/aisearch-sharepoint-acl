@@ -119,6 +119,7 @@ module web 'modules/web.bicep' = {
       { name: 'GROUP_ALL_STAFF_ID', value: entra.outputs.groupAllStaffId }
       { name: 'GROUP_QUANTUM_ID', value: entra.outputs.groupQuantumId }
       { name: 'GROUP_ADMINS_ID', value: entra.outputs.groupAdminsId }
+      { name: 'GROUP_DEMO_USERS_ID', value: entra.outputs.groupDemoUsersId }
       { name: 'PORT', value: '8080' }
     ]
   }

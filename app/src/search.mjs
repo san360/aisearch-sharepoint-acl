@@ -3,8 +3,12 @@ import { config } from './config.mjs';
 
 const SELECT = 'chunk_id,parent_id,title,url,metadata_spo_item_path,site,last_modified,chunk';
 
+export function searchUrl(path) {
+  return `${config.searchEndpoint}/${path}${path.includes('?') ? '&' : '?'}api-version=${config.searchApiVersion}`;
+}
+
 export async function searchApi(path, { method = 'GET', body, headers = {} } = {}) {
-  const url = `${config.searchEndpoint}/${path}${path.includes('?') ? '&' : '?'}api-version=${config.searchApiVersion}`;
+  const url = searchUrl(path);
   const res = await fetch(url, {
     method,
     headers: {
@@ -25,6 +29,7 @@ export async function searchApi(path, { method = 'GET', body, headers = {} } = {
     }
     const err = new Error(message);
     err.status = res.status;
+    err.responseBody = data;
     throw err;
   }
   return data;
@@ -38,7 +43,7 @@ export async function searchApi(path, { method = 'GET', body, headers = {} } = {
  *   and trims results against the UserIds/GroupIds stored on each chunk.
  * - elevated=true (admins only) adds x-ms-enable-elevated-read to bypass trimming.
  */
-export async function searchAsUser(userToken, { q = '*', mode = 'hybrid', top = 10, elevated = false, withAcl = false } = {}) {
+export async function searchAsUser(userToken, { q = '*', mode = 'hybrid', top = 10, elevated = false, withAcl = false, raw = false } = {}) {
   const text = q?.trim() || '*';
   const body = {
     search: text,
@@ -58,13 +63,36 @@ export async function searchAsUser(userToken, { q = '*', mode = 'hybrid', top = 
     body.vectorQueries = [{ kind: 'text', text, fields: 'chunk_vector', k: 50 }];
   }
   const headers = {};
-  // Elevated read can't be combined with a user token: it's an admin-only, untrimmed view.
-  if (elevated) headers['x-ms-enable-elevated-read'] = 'true';
-  else if (userToken) headers['x-ms-query-source-authorization'] = userToken;
+  // Elevated read (admins only) bypasses trimming. It requires the caller's own Entra token as Authorization
+  // (app-only tokens are rejected) and can't be combined with x-ms-query-source-authorization.
+  if (elevated) {
+    headers['x-ms-enable-elevated-read'] = 'true';
+    headers.Authorization = `Bearer ${userToken}`;
+  } else if (userToken) headers['x-ms-query-source-authorization'] = userToken;
 
   const started = Date.now();
-  const data = await searchApi(`indexes('${config.indexName}')/docs/search.post.search`, { method: 'POST', body, headers });
+  const path = `indexes('${config.indexName}')/docs/search.post.search`;
+  // What was sent to Azure AI Search, for display. Tokens are never echoed back to the browser.
+  const rawRequest = raw ? {
+    method: 'POST',
+    url: searchUrl(path),
+    headers: {
+      Authorization: elevated ? 'Bearer <your Entra token — redacted>' : 'Bearer <web app managed identity token — redacted>',
+      'Content-Type': 'application/json',
+      ...(headers['x-ms-query-source-authorization'] ? { 'x-ms-query-source-authorization': '<your Entra token — redacted>' } : {}),
+      ...(elevated ? { 'x-ms-enable-elevated-read': 'true' } : {}),
+    },
+    body,
+  } : undefined;
+  let data;
+  try {
+    data = await searchApi(path, { method: 'POST', body, headers });
+  } catch (e) {
+    if (raw) e.raw = { request: rawRequest, response: { status: e.status, body: e.responseBody } };
+    throw e;
+  }
   return {
+    ...(raw ? { raw: { request: rawRequest, response: { status: 200, tookMs: Date.now() - started, body: data } } } : {}),
     count: data['@odata.count'] ?? data.value.length,
     tookMs: Date.now() - started,
     results: data.value.map((d) => ({

@@ -91,7 +91,7 @@ real browser; queries ran through the web app with the user's token. Detailed pr
 | RAG chat | Each persona's answer lists only its own codewords and cites only accessible documents |
 | No user token | 0 results (index queried without `x-ms-query-source-authorization`) |
 | Request without sign-in | 401 from the app |
-| Elevated read + user token on the same request | Rejected by the service; the app sends elevated read without a user token |
+| Elevated read | Requires a **user** token with the elevated-read permission as `Authorization` (app-only tokens are rejected: *"requires an AAD user access token"*) and can't be combined with `x-ms-query-source-authorization`. The app sends the signed-in admin's token |
 | Users not in an indexed site's user list | Whole query fails with 404 "User cannot be found" (see [above](#site-user-list)) — fixed by `ensureuser` |
 | Index schema | A field named `metadata_spo_item_path` is required; the `sharepointSiteUrl` field must be **filterable**, otherwise every write fails ("Unable to complete aggregations search request") |
 | Temporary Access Pass | Issuance returns 400 for a few minutes after the method is enabled (the script retries) |

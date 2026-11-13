@@ -78,8 +78,34 @@ async function api(path, body, method = body ? 'POST' : 'GET') {
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+  if (!res.ok) {
+    const err = new Error(data.error ?? `HTTP ${res.status}`);
+    err.data = data;
+    throw err;
+  }
   return data;
+}
+
+// Pretty-print JSON with light syntax colouring (escaped first, so it's safe as innerHTML).
+function jsonHtml(value) {
+  return esc(JSON.stringify(value, null, 2)).replace(
+    /(&quot;(?:\\.|[^&\\]|&(?!quot;))*?&quot;)(\s*:)?|\b(true|false|null)\b|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
+    (m, str, colon, lit, num) => {
+      if (str) return colon ? `<span class="j-key">${str}</span>${colon}` : `<span class="j-str">${str}</span>`;
+      if (lit) return `<span class="j-lit">${lit}</span>`;
+      return `<span class="j-num">${num}</span>`;
+    });
+}
+
+function showRaw(raw) {
+  if (!raw) return $('#rawPanel').classList.add('hidden');
+  $('#rawPanel').classList.remove('hidden');
+  const r = raw.response ?? {};
+  $('#rawMeta').textContent = `· HTTP ${r.status ?? '?'}${r.tookMs != null ? ` · ${r.tookMs} ms` : ''} · ${raw.request?.body?.queryType ?? 'simple'}${raw.request?.body?.vectorQueries ? ' + vector' : ''}`;
+  $('#rawReq').innerHTML = jsonHtml(raw.request);
+  $('#rawRes').innerHTML = jsonHtml(r.body ?? null);
+  $('#rawReq')._json = JSON.stringify(raw.request, null, 2);
+  $('#rawRes')._json = JSON.stringify(r.body ?? null, null, 2);
 }
 
 // ---------- shell ----------
@@ -165,6 +191,7 @@ async function runSearch() {
   $('#results').innerHTML = '';
   try {
     const data = await api('/api/search', { q: q || '*', mode, top: 20 });
+    showRaw(data.raw);
     // group chunks by source document
     const docs = new Map();
     for (const r of data.results) {
@@ -201,27 +228,47 @@ async function runSearch() {
     }).join('');
   } catch (e) {
     $('#searchMeta').textContent = '';
+    showRaw(e.data?.raw);
     $('#results').innerHTML = `<div class="errbox">${esc(e.message)}</div>`;
   }
 }
 
 // ---------- chat ----------
+const CHAT_EMPTY = `
+  <div class="chat-empty">
+    <h3>Ask questions grounded in the documents <u>you</u> can read</h3>
+    <p class="muted">Every question runs a <b>new</b> hybrid search with your token, so the model only ever receives
+      ACL-trimmed chunks. The last few messages are passed along as conversation context; nothing is stored on the server.</p>
+  </div>`;
+
 function renderChat() {
   const log = $('#chatLog');
-  if (!chatHistory.length) return;
+  $('#newChat').disabled = !chatHistory.length;
+  if (!chatHistory.length) {
+    log.innerHTML = CHAT_EMPTY;
+    return;
+  }
   log.innerHTML = chatHistory.map((m) => {
     if (m.role === 'user') return `<div class="msg user">${esc(m.content)}</div>`;
     if (m.pending) return '<div class="msg bot typing">Retrieving the chunks you can access…</div>';
     const sources = (m.sources ?? []).map((s) => `<div class="src"><b>[${s.n}]</b> <a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.title)}</a> · ${esc(siteName(s.site))} / ${esc(folderOf(s.path))}</div>`).join('');
-    return `<div class="msg bot">${esc(m.content)}${sources ? `<div class="sources">${sources}</div>` : ''}<div class="src">${m.retrieved ?? 0} chunk(s) retrieved after ACL trimming</div></div>`;
+    const searched = m.searched != null ? `🔎 searched “${esc(m.searched)}” as you (hybrid) · ` : '';
+    return `<div class="msg bot">${esc(m.content)}${sources ? `<div class="sources">${sources}</div>` : ''}<div class="src">${searched}${m.retrieved ?? 0} chunk(s) retrieved after ACL trimming</div></div>`;
   }).join('');
   log.scrollTop = log.scrollHeight;
   window.scrollTo(0, document.body.scrollHeight);
 }
 
+function newConversation() {
+  if (chatHistory.some((m) => m.pending)) return;
+  chatHistory.length = 0;
+  renderChat();
+  $('#chatQ').focus();
+}
+
 async function ask() {
   const q = $('#chatQ').value.trim();
-  if (!q) return;
+  if (!q || chatHistory.some((m) => m.pending)) return;
   $('#chatQ').value = '';
   chatHistory.push({ role: 'user', content: q });
   const pending = { role: 'assistant', pending: true };
@@ -230,7 +277,7 @@ async function ask() {
   try {
     const msgs = chatHistory.filter((m) => !m.pending).map(({ role, content }) => ({ role, content }));
     const data = await api('/api/chat', { messages: msgs });
-    Object.assign(pending, { pending: false, content: data.answer, sources: data.sources, retrieved: data.retrieved });
+    Object.assign(pending, { pending: false, content: data.answer, sources: data.sources, retrieved: data.retrieved, searched: data.searched });
   } catch (e) {
     Object.assign(pending, { pending: false, content: `Error: ${e.message}` });
   }
@@ -278,13 +325,69 @@ async function loadProof() {
 }
 
 // ---------- how ----------
-function renderMatrix() {
+const VIA = { user: '👤', 'entra-group': '👥', 'sp-group': '🟦' };
+
+function designRow(upn) {
+  const key = ['alice', 'bob', 'carol'].find((p) => upn.toLowerCase().startsWith(`${p}.`));
+  return key ? MATRIX.rows.find(([k]) => k === key) : null;
+}
+
+function renderDesignMatrix() {
   const p = persona();
   $('#matrix').innerHTML = `
-    <tr><th>Persona</th>${MATRIX.cols.map(([f, c]) => `<th>${esc(f)}<br><small class="muted">${c}</small></th>`).join('')}</tr>
+    <tr><th>Persona (design)</th>${MATRIX.cols.map(([f, c]) => `<th>${esc(f)}<br><small class="muted">${c}</small></th>`).join('')}</tr>
     ${MATRIX.rows.map(([key, label, cells]) => `
       <tr class="${key === p ? 'me' : ''}"><td>${esc(label)}${key === p ? ' <span class="badge">you</span>' : ''}</td>
       ${cells.map((v) => `<td class="${v ? 'yes' : 'no'}">${v ? '✔' : '—'}</td>`).join('')}</tr>`).join('')}`;
+}
+
+async function renderMatrix() {
+  $('#matrixMeta').innerHTML = '<span class="spinner"></span> Reading ACLs from the index and resolving group memberships…';
+  try {
+    const data = await api('/api/matrix');
+    const head = data.columns.map((c) => `
+      <th>${esc(c.siteName)} / ${esc(c.folder)}<br><small class="muted">${esc(c.codeword)}</small>
+        <div class="acl">${c.indexed === undefined
+          ? (c.granted ? '' : '<span class="warn-text">no Sites.Selected grant</span>')
+          : c.indexed
+          ? esc(c.principals.join(' · '))
+          : `<span class="warn-text">not indexed${c.granted ? '' : ' — no Sites.Selected grant'}</span>`}</div></th>`).join('');
+    const rows = data.rows.map((r) => {
+      const design = designRow(r.upn);
+      const matches = design ? r.cells.every((c, i) => c.access === Boolean(design[2][i])) : null;
+      const notes = [
+        design ? (matches ? '<span class="pill ok">matches design</span>' : '<span class="pill bad">differs from design</span>') : '',
+        r.notInSiteList.length ? `<span class="pill bad" title="Azure AI Search looks every user up in each indexed site; queries fail until the user is in the site's user list">⚠ not in user list: ${esc(r.notInSiteList.join(', '))}</span>` : '',
+        ...r.warnings.map((w) => `<span class="pill bad">${esc(w)}</span>`),
+      ].join(' ');
+      const cells = r.cells.map((c) => {
+        let live = '';
+        if (c.verified !== undefined) {
+          live = c.verified?.error
+            ? `<div class="live bad">your query: error</div>`
+            : `<div class="live ${c.verified === c.access ? 'ok' : 'bad'}">🔎 your query: ${c.verified ? 'found' : 'hidden'}</div>`;
+        }
+        return c.access
+          ? `<td class="yes">✔<div class="via">${VIA[c.via] ?? ''} ${esc(c.label)}</div>${live}</td>`
+          : `<td class="no">—${live}</td>`;
+      }).join('');
+      return `<tr class="${r.me ? 'me' : ''}"><td>${esc(r.displayName ?? r.upn)}${r.me ? ' <span class="badge">you</span>' : ''}
+        <div class="muted small">${esc(r.upn)}</div>${notes}</td>${cells}</tr>`;
+    }).join('');
+    const p = persona();
+    const designRows = data.scope === 'self' ? MATRIX.rows.filter(([key]) => key !== p).map(([, label, cells]) => `
+      <tr class="design"><td>${esc(label)}<div><span class="pill">design — not computed for you</span></div></td>
+      ${cells.map((v) => `<td class="${v ? 'yes' : 'no'}">${v ? '✔' : '—'}</td>`).join('')}</tr>`).join('') : '';
+    $('#matrix').innerHTML = `<tr><th>Who</th>${head}</tr>${rows}${designRows}`;
+    $('#matrixMeta').innerHTML = data.scope === 'self'
+      ? `Your row: real ACL-trimmed queries with your token (${new Date(data.generatedAt).toLocaleTimeString()}, ${data.tookMs} ms).
+         Computing every persona's row needs elevated read of the stored ACLs — sign in as a member of the demo admins group.`
+      : `Computed ${new Date(data.generatedAt).toLocaleTimeString()} in ${data.tookMs} ms ·
+      👤 direct permission · 👥 Entra group · 🟦 SharePoint site group${data.spError ? ` · <span class="warn-text">${esc(data.spError)}</span>` : ''}`;
+  } catch (e) {
+    $('#matrixMeta').innerHTML = `<span class="warn-text">Live computation failed (${esc(e.message)}). Showing the design matrix.</span>`;
+    renderDesignMatrix();
+  }
 }
 
 // ---------- admin ----------
@@ -411,7 +514,14 @@ async function boot() {
   }));
   $('#searchForm').onsubmit = (e) => { e.preventDefault(); runSearch(); };
   $('#chatForm').onsubmit = (e) => { e.preventDefault(); ask(); };
+  $('#newChat').onclick = newConversation;
+  renderChat();
   $('#proofRefresh').onclick = loadProof;
+  $$('[data-copy]').forEach((b) => (b.onclick = async () => {
+    await navigator.clipboard.writeText($(`#${b.dataset.copy}`)._json ?? '');
+    toast('Copied JSON');
+  }));
+  $('#matrixRefresh').onclick = renderMatrix;
   $('#ixRefresh').onclick = loadIndexers;
   $('#adminSearchForm').onsubmit = (e) => { e.preventDefault(); adminSearch(); };
 

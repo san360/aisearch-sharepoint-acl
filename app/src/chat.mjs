@@ -38,5 +38,6 @@ export async function chat(userToken, messages) {
     answer: data.choices?.[0]?.message?.content ?? '',
     sources: sources.map(({ text, ...s }) => ({ ...s, excerpt: text.slice(0, 300) })),
     retrieved: retrieval.count,
+    searched: question,
   };
 }
