@@ -6,40 +6,60 @@ The complete list of prompts and expected results per persona is in [test-plan.m
 
 ## Who has access to what (and at which level)
 
-Permissions are granted at two scopes. **Site** means a role assignment on the site, which every folder and document
-inherits unless it has unique permissions. **Folder** means the folder broke inheritance, so only the listed principals (plus
-the site Owners group) can read the folder and every document in it.
+### The three SharePoint sites
 
-| Site / folder | Inheritance | Who has access | How it's granted | Level |
-|---|---|---|---|---|
-| **Research** (site) | — | *All staff* (Entra group: Alice, Bob, Carol) | Site role assignment | Read |
-| Research / **Public** | Inherits from site | *All staff* → Alice, Bob, Carol | Site (inherited) | Read |
-| Research / **Quantum** | **Unique** (inheritance broken) | *Quantum team* (Entra group: Alice) | Folder role assignment to an Entra group | Read |
-| Research / **Bio** | **Unique** (inheritance broken) | Carol | Folder role assignment to a **user** (direct) | Read |
-| **Finance** (site) | — | Bob | Member of the SharePoint **Members** site group (Bob added directly) | Edit (Members default) |
-| Finance / **Reports** | Inherits from site | Bob | Site (inherited, via the *Members* group) | Edit |
-| **HR** (site) | — | *All staff* → Alice, Bob, Carol | Site role assignment | Read |
-| HR / **Confidential** | Inherits from site | *All staff* → Alice, Bob, Carol | Site (inherited) | Read — **but never indexed** |
+Each is a separate **site collection** (communication site). Folders live in the site's default *Documents* library
+(`Shared Documents`). `acldemo` is the default `DEMO_PREFIX`.
 
-The deploying admin owns all three sites (*Owners* SharePoint group, Full Control) and keeps access to the unique
-folders as well.
+| Site key | SharePoint site name | Site URL | Folders in *Documents* |
+|---|---|---|---|
+| Research | **ACL Demo - Research** | `https://<tenant>.sharepoint.com/sites/acldemo-research` | `Public`, `Quantum`, `Bio` |
+| Finance | **ACL Demo - Finance** | `https://<tenant>.sharepoint.com/sites/acldemo-finance` | `Reports` |
+| HR | **ACL Demo - HR Confidential** | `https://<tenant>.sharepoint.com/sites/acldemo-hr` | `Confidential` |
+
+Permissions are granted at two scopes:
+
+* **Site-level**: a role assignment on the site. Every folder and document inherits it unless it has unique permissions.
+* **Folder-level (unique)**: the folder broke inheritance, so only the listed principals (plus the site *Owners* group)
+  can read the folder and every document in it. Site-level grants such as *All staff* no longer apply there.
+
+### Permissions per location
+
+| SharePoint site | Folder | Scope | Granted to | How | Level |
+|---|---|---|---|---|---|
+| ACL Demo - Research | *(whole site)* | **Site** | *All staff* (Entra group: Alice, Bob, Carol) | Site role assignment | Read |
+| ACL Demo - Research | `Public` | Site (inherited) | *All staff* | Inherits from the site | Read |
+| ACL Demo - Research | `Quantum` | **Folder (unique)** | *Quantum team* (Entra group: Alice) | Folder role assignment to an Entra group | Read |
+| ACL Demo - Research | `Bio` | **Folder (unique)** | Carol | Folder role assignment to a **user** (direct) | Read |
+| ACL Demo - Finance | *(whole site)* | **Site** | Bob | Member of the SharePoint **Members** site group | Edit (Members default) |
+| ACL Demo - Finance | `Reports` | Site (inherited) | Bob | Inherits from the site (via *Members*) | Edit |
+| ACL Demo - HR Confidential | *(whole site)* | **Site** | *All staff* | Site role assignment | Read |
+| ACL Demo - HR Confidential | `Confidential` | Site (inherited) | *All staff* | Inherits from the site | Read — **never indexed** |
+
+The deploying admin owns all three sites (*Owners* SharePoint group, Full Control), including the unique folders.
 
 ### Per persona
 
-| Persona | Research / Public | Research / Quantum | Research / Bio | Finance / Reports | HR / Confidential (in SharePoint) | Visible in search |
+Rows are SharePoint locations; ✅ / ⛔ is what the persona can open **in SharePoint**, with the scope and the reason.
+
+| SharePoint site | Folder | Codeword | Alice | Bob | Carol | admin@ |
 |---|---|---|---|---|---|---|
-| **Alice** | ✅ site Read (All staff) | ✅ folder Read (Quantum team group) | ⛔ | ⛔ no site access | ✅ site Read (All staff) | BLUEBIRD, AURORA |
-| **Bob** | ✅ site Read (All staff) | ⛔ unique, not listed | ⛔ unique, not listed | ✅ site Edit (SharePoint *Members* group) | ✅ site Read (All staff) | BLUEBIRD, NIGHTJAR |
-| **Carol** | ✅ site Read (All staff) | ⛔ unique, not listed | ✅ folder Read (direct user) | ⛔ no site access | ✅ site Read (All staff) | BLUEBIRD, KESTREL |
-| **admin@** | ✅ Owners (Full Control) | ✅ Owners | ✅ Owners | ✅ Owners | ✅ Owners | everything except OSPREY |
+| ACL Demo - Research | `Public` | BLUEBIRD | ✅ Site Read — *All staff* | ✅ Site Read — *All staff* | ✅ Site Read — *All staff* | ✅ Site Owner |
+| ACL Demo - Research | `Quantum` | AURORA | ✅ **Folder** Read — *Quantum team* group | ⛔ unique folder, not listed | ⛔ unique folder, not listed | ✅ Site Owner |
+| ACL Demo - Research | `Bio` | KESTREL | ⛔ unique folder, not listed | ⛔ unique folder, not listed | ✅ **Folder** Read — direct user | ✅ Site Owner |
+| ACL Demo - Finance | `Reports` | NIGHTJAR | ⛔ no access to the site | ✅ Site Edit — SharePoint *Members* group | ⛔ no access to the site | ✅ Site Owner |
+| ACL Demo - HR Confidential | `Confidential` | OSPREY | ✅ Site Read — *All staff* | ✅ Site Read — *All staff* | ✅ Site Read — *All staff* | ✅ Site Owner |
+| **Visible in search** | | | BLUEBIRD, AURORA | BLUEBIRD, NIGHTJAR | BLUEBIRD, KESTREL | all except OSPREY |
+
+OSPREY is readable by everyone in SharePoint but never appears in search: the HR site isn't granted to the ingestion app.
 
 ### The ingestion app (what gets indexed)
 
-| Site | `Sites.Selected` grant | Result |
+| SharePoint site | `Sites.Selected` grant | Result |
 |---|---|---|
-| Research | `read` | Indexed with item-level ACLs (`ixr-research`) |
-| Finance | `read` | Indexed with item-level ACLs (`ixr-finance`) |
-| HR | **none** | Graph returns 403. Azure AI Search refuses to create the indexer (`accessDenied`), so there are only **two** indexers. Everyone can read HR **in SharePoint**, yet OSPREY never appears in search |
+| ACL Demo - Research | `read` | Indexed with item-level ACLs (`ixr-research`) |
+| ACL Demo - Finance | `read` | Indexed with item-level ACLs (`ixr-finance`) |
+| ACL Demo - HR Confidential | **none** | Graph returns 403. Azure AI Search refuses to create the indexer (`accessDenied`), so there are only **two** indexers. Everyone can read HR **in SharePoint**, yet OSPREY never appears in search |
 
 Each folder holds one *Access note* (with the codeword) and arXiv papers; documents inherit the folder's permissions. The
 full document list (D1–D14) is in [test-plan.md](test-plan.md#1-documents-and-who-can-read-them).
