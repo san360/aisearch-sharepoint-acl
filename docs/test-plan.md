@@ -114,4 +114,19 @@ Token strip: roles claim = `Sites.Selected`, obtained with a federated credentia
 
 ## Recorded results
 
+### How to validate a hybrid result manually
+
+Example: Bob searches `AURORA` in **Hybrid** and gets ~20 results.
+
+1. Same query in **Keyword** mode → 0 results (the exact term only exists in the Quantum note).
+2. *Raw request & response*: `@odata.count` = the vector `k` (50) after trimming; every `metadata_spo_item_path` is under
+   `/Public/` or `/Reports/`; no hit has `@search.highlights` → all are *vector neighbours*, not matches.
+3. Same query as Alice → *Access note - Quantum.md* ranks first with AURORA highlighted.
+4. In SharePoint as Bob: every result link opens; the Quantum note's URL (copy it from Alice's result) → *Access denied*.
+5. In SharePoint as admin: Quantum folder → *Manage access* lists only *Quantum team* and the site *Owners*;
+   *Site permissions → Check permissions* for Bob shows no access to that folder.
+6. Admin tab → *Who can see what* → `AURORA`: stored `GroupIds` = Quantum team + Research Owners only.
+7. Add Bob to *Quantum team* (Admin tab), re-run the hybrid query → the Quantum note appears first as a *keyword match*
+   with no re-index; remove him → it disappears.
+
 _See "Validation results" in [limitations.md](limitations.md)._
