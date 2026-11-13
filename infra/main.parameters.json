@@ -1,0 +1,14 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": { "value": "${AZURE_ENV_NAME}" },
+    "location": { "value": "${AZURE_LOCATION=francecentral}" },
+    "principalId": { "value": "${AZURE_PRINCIPAL_ID}" },
+    "sharePointHostname": { "value": "${SHAREPOINT_HOSTNAME}" },
+    "demoPrefix": { "value": "${DEMO_PREFIX=acldemo}" },
+    "grantFilesReadAll": { "value": "${GRANT_FILES_READ_ALL=false}" },
+    "deploymentSkuName": { "value": "${AOAI_DEPLOYMENT_SKU=GlobalStandard}" },
+    "webAppExists": { "value": "${SERVICE_WEB_RESOURCE_EXISTS=false}" }
+  }
+}

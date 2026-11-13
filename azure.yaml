@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+name: aisearch-sharepoint-acl
+metadata:
+  template: aisearch-sharepoint-acl@0.1.0
+infra:
+  provider: bicep
+  path: infra
+services:
+  web:
+    project: ./app
+    language: js
+    host: containerapp
+    docker:
+      path: Dockerfile
+      remoteBuild: true
+hooks:
+  preprovision:
+    windows:
+      shell: pwsh
+      run: node ./scripts/preprovision.mjs
+      continueOnError: false
+    posix:
+      shell: sh
+      run: node ./scripts/preprovision.mjs
+      continueOnError: false
+  postprovision:
+    windows:
+      shell: pwsh
+      run: npm --prefix ./scripts install --no-audit --no-fund --silent; node ./scripts/setup/index.mjs
+      interactive: true
+      continueOnError: false
+    posix:
+      shell: sh
+      run: npm --prefix ./scripts install --no-audit --no-fund --silent && node ./scripts/setup/index.mjs
+      interactive: true
+      continueOnError: false

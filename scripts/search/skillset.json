@@ -1,0 +1,53 @@
+{
+  "name": "sharepoint-acl-skillset",
+  "description": "Chunk + embed. ACL metadata is projected onto every chunk (required with skipIndexingParentDocuments).",
+  "skills": [
+    {
+      "@odata.type": "#Microsoft.Skills.Text.SplitSkill",
+      "name": "split",
+      "context": "/document",
+      "textSplitMode": "pages",
+      "maximumPageLength": 2000,
+      "pageOverlapLength": 300,
+      "inputs": [{ "name": "text", "source": "/document/content" }],
+      "outputs": [{ "name": "textItems", "targetName": "pages" }]
+    },
+    {
+      "@odata.type": "#Microsoft.Skills.Text.AzureOpenAIEmbeddingSkill",
+      "name": "embed",
+      "context": "/document/pages/*",
+      "resourceUri": "${AZURE_OPENAI_ENDPOINT}",
+      "deploymentId": "${AZURE_OPENAI_EMBEDDING_DEPLOYMENT}",
+      "modelName": "${AZURE_OPENAI_EMBEDDING_MODEL}",
+      "dimensions": 3072,
+      "authIdentity": {
+        "@odata.type": "#Microsoft.Azure.Search.DataUserAssignedIdentity",
+        "userAssignedIdentity": "${SEARCH_IDENTITY_RESOURCE_ID}"
+      },
+      "inputs": [{ "name": "text", "source": "/document/pages/*" }],
+      "outputs": [{ "name": "embedding", "targetName": "vector" }]
+    }
+  ],
+  "indexProjections": {
+    "selectors": [
+      {
+        "targetIndexName": "${SEARCH_INDEX_NAME}",
+        "parentKeyFieldName": "parent_id",
+        "sourceContext": "/document/pages/*",
+        "mappings": [
+          { "name": "chunk", "source": "/document/pages/*" },
+          { "name": "chunk_vector", "source": "/document/pages/*/vector" },
+          { "name": "title", "source": "/document/metadata_spo_item_name" },
+          { "name": "url", "source": "/document/metadata_spo_item_weburi" },
+          { "name": "metadata_spo_item_path", "source": "/document/metadata_spo_item_path" },
+          { "name": "last_modified", "source": "/document/metadata_spo_item_last_modified" },
+          { "name": "site", "source": "/document/metadata_spo_site_url" },
+          { "name": "SharePointSiteUrl", "source": "/document/metadata_spo_site_url" },
+          { "name": "UserIds", "source": "/document/metadata_user_ids" },
+          { "name": "GroupIds", "source": "/document/metadata_group_ids" }
+        ]
+      }
+    ],
+    "parameters": { "projectionMode": "skipIndexingParentDocuments" }
+  }
+}

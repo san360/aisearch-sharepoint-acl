@@ -1,0 +1,86 @@
+### Azure AI Search — ACL-trimmed queries against the SharePoint index
+# Use with the VS Code "REST Client" extension.
+#
+# Tokens (PowerShell, azd login as the admin):
+#   $env:SEARCH_ADMIN_TOKEN = (azd auth token --scope https://search.azure.com/.default -o json | ConvertFrom-Json).token
+# A persona's user token: sign in to the web app as the persona, open the browser dev tools,
+# and copy the Authorization header of any /api/search request.
+#
+# Copy values from `azd env get-values` into a .env file next to this file (gitignored):
+#   SEARCH_ENDPOINT=https://<service>.search.windows.net
+#   SEARCH_ADMIN_TOKEN=...
+#   PERSONA_TOKEN=...
+
+@endpoint = {{$dotenv SEARCH_ENDPOINT}}
+@index = sharepoint-acl-index
+@api = 2026-08-01-preview
+@adminToken = {{$dotenv SEARCH_ADMIN_TOKEN}}
+@personaToken = {{$dotenv PERSONA_TOKEN}}
+
+### 1. No user token -> ACL-protected chunks are NOT returned (count should be 0)
+POST {{endpoint}}/indexes/{{index}}/docs/search?api-version={{api}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "search": "AURORA", "count": true, "select": "title,path" }
+
+### 2. Same query as a persona -> trimmed to what that persona can read
+POST {{endpoint}}/indexes/{{index}}/docs/search?api-version={{api}}
+Authorization: Bearer {{adminToken}}
+x-ms-query-source-authorization: {{personaToken}}
+Content-Type: application/json
+
+{ "search": "AURORA", "count": true, "select": "title,path" }
+
+### 3. Elevated read (Search Index Data Contributor) -> everything, with the stored ACLs
+#    Note: x-ms-enable-elevated-read can't be combined with x-ms-query-source-authorization.
+POST {{endpoint}}/indexes/{{index}}/docs/search?api-version={{api}}
+Authorization: Bearer {{adminToken}}
+x-ms-enable-elevated-read: true
+Content-Type: application/json
+
+{ "search": "*", "count": true, "top": 50, "select": "title,path,site,UserIds,GroupIds" }
+
+### 4. Hybrid + semantic query as a persona (what the Ask tab retrieves)
+POST {{endpoint}}/indexes/{{index}}/docs/search?api-version={{api}}
+Authorization: Bearer {{adminToken}}
+x-ms-query-source-authorization: {{personaToken}}
+Content-Type: application/json
+
+{
+  "search": "superconducting qubits",
+  "count": true,
+  "top": 5,
+  "select": "title,path",
+  "queryType": "semantic",
+  "semanticConfiguration": "semantic-config",
+  "vectorQueries": [{ "kind": "text", "text": "superconducting qubits", "fields": "chunk_vector", "k": 50 }]
+}
+
+### 5. Codeword per folder (run as each persona)
+#   BLUEBIRD  Research/Public    -> Alice, Bob, Carol
+#   AURORA    Research/Quantum   -> Alice
+#   KESTREL   Research/Bio       -> Carol
+#   NIGHTJAR  Finance/Reports    -> Bob
+#   OSPREY    HR/Confidential    -> nobody (site not granted to the ingestion app)
+POST {{endpoint}}/indexes/{{index}}/docs/search?api-version={{api}}
+Authorization: Bearer {{adminToken}}
+x-ms-query-source-authorization: {{personaToken}}
+Content-Type: application/json
+
+{ "search": "BLUEBIRD AURORA KESTREL NIGHTJAR OSPREY", "searchMode": "any", "count": true, "select": "title,path" }
+
+### 6. Indexer status (one per site)
+GET {{endpoint}}/indexers('ixr-hr')/search.status?api-version={{api}}
+Authorization: Bearer {{adminToken}}
+
+### 7. Refresh ACLs after a parent-scope (site/library/folder) permission change
+POST {{endpoint}}/indexers('ixr-research')/search.resync?api-version={{api}}
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{ "options": ["permissions"] }
+
+### 8. Then run the indexer
+POST {{endpoint}}/indexers('ixr-research')/search.run?api-version={{api}}
+Authorization: Bearer {{adminToken}}

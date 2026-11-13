@@ -1,0 +1,56 @@
+{
+  "name": "${SEARCH_INDEX_NAME}",
+  "description": "SharePoint content (3 sites) chunked + vectorized, with SharePoint ACLs on every chunk.",
+  "permissionFilterOption": "enabled",
+  "sharePointConnectorAppRegistration": {
+    "applicationId": "${INGEST_APP_CLIENT_ID}",
+    "federatedCredentialId": "${SEARCH_IDENTITY_CLIENT_ID}",
+    "tenantId": "${AZURE_TENANT_ID}"
+  },
+  "fields": [
+    { "name": "chunk_id", "type": "Edm.String", "key": true, "searchable": true, "analyzer": "keyword", "retrievable": true, "sortable": true, "filterable": false, "facetable": false },
+    { "name": "parent_id", "type": "Edm.String", "searchable": false, "filterable": true, "retrievable": true, "sortable": false, "facetable": false },
+    { "name": "title", "type": "Edm.String", "searchable": true, "filterable": true, "retrievable": true, "sortable": true, "facetable": false, "analyzer": "en.microsoft" },
+    { "name": "url", "type": "Edm.String", "searchable": false, "filterable": false, "retrievable": true, "sortable": false, "facetable": false },
+    { "name": "metadata_spo_item_path", "type": "Edm.String", "searchable": false, "filterable": true, "retrievable": true, "sortable": false, "facetable": true },
+    { "name": "site", "type": "Edm.String", "searchable": false, "filterable": true, "retrievable": true, "sortable": false, "facetable": true },
+    { "name": "last_modified", "type": "Edm.DateTimeOffset", "searchable": false, "filterable": true, "retrievable": true, "sortable": true, "facetable": false },
+    { "name": "chunk", "type": "Edm.String", "searchable": true, "filterable": false, "retrievable": true, "sortable": false, "facetable": false, "analyzer": "en.microsoft" },
+    { "name": "chunk_vector", "type": "Collection(Edm.Single)", "searchable": true, "retrievable": false, "stored": false, "dimensions": 3072, "vectorSearchProfile": "vector-profile" },
+    { "name": "UserIds", "type": "Collection(Edm.String)", "permissionFilter": "userIds", "searchable": false, "filterable": true, "retrievable": true, "sortable": false, "facetable": false },
+    { "name": "GroupIds", "type": "Collection(Edm.String)", "permissionFilter": "groupIds", "searchable": false, "filterable": true, "retrievable": true, "sortable": false, "facetable": false },
+    { "name": "SharePointSiteUrl", "type": "Edm.String", "sharepointSiteUrl": true, "searchable": false, "filterable": true, "retrievable": true, "sortable": false, "facetable": false }
+  ],
+  "semantic": {
+    "defaultConfiguration": "semantic-config",
+    "configurations": [
+      {
+        "name": "semantic-config",
+        "prioritizedFields": {
+          "titleField": { "fieldName": "title" },
+          "prioritizedContentFields": [{ "fieldName": "chunk" }],
+          "prioritizedKeywordsFields": []
+        }
+      }
+    ]
+  },
+  "vectorSearch": {
+    "algorithms": [{ "name": "hnsw", "kind": "hnsw", "hnswParameters": { "metric": "cosine" } }],
+    "profiles": [{ "name": "vector-profile", "algorithm": "hnsw", "vectorizer": "aoai-vectorizer" }],
+    "vectorizers": [
+      {
+        "name": "aoai-vectorizer",
+        "kind": "azureOpenAI",
+        "azureOpenAIParameters": {
+          "resourceUri": "${AZURE_OPENAI_ENDPOINT}",
+          "deploymentId": "${AZURE_OPENAI_EMBEDDING_DEPLOYMENT}",
+          "modelName": "${AZURE_OPENAI_EMBEDDING_MODEL}",
+          "authIdentity": {
+            "@odata.type": "#Microsoft.Azure.Search.DataUserAssignedIdentity",
+            "userAssignedIdentity": "${SEARCH_IDENTITY_RESOURCE_ID}"
+          }
+        }
+      }
+    ]
+  }
+}

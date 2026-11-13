@@ -1,0 +1,12 @@
+{
+  "name": "aisearch-sharepoint-acl-setup",
+  "private": true,
+  "type": "module",
+  "description": "Deployment-time setup: demo users, SharePoint sites, permissions, Sites.Selected grants and the Azure AI Search pipeline.",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^7.2.2"
+  }
+}

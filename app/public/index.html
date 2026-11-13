@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SharePoint × Azure AI Search — ACL trimming demo</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%233b82f6'/><path d='M9 16l5 5 9-10' stroke='white' stroke-width='3' fill='none' stroke-linecap='round'/></svg>" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">⛨</div>
+      <div>
+        <div class="brand-title">Permission-aware search</div>
+        <div class="brand-sub">SharePoint → Azure AI Search · ACLs enforced at query time</div>
+      </div>
+    </div>
+    <nav class="tabs" id="tabs">
+      <button data-tab="search" class="active">Search</button>
+      <button data-tab="ask">Ask</button>
+      <button data-tab="proof">Sites.Selected proof</button>
+      <button data-tab="how">How it works</button>
+      <button data-tab="admin" class="hidden" id="adminTabBtn">Admin</button>
+    </nav>
+    <div class="user" id="userArea">
+      <button class="btn primary" id="signInBtn">Sign in</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Signed-out hero -->
+    <section id="hero" class="hero">
+      <h1>Same query. Different people. Different answers.</h1>
+      <p>Documents are indexed from three SharePoint sites together with their permissions.
+        When you search, Azure AI Search receives <em>your</em> Entra token and silently drops every chunk you are not allowed to read — before ranking, before the LLM ever sees it.</p>
+      <div class="hero-grid">
+        <div class="hero-card"><b>Alice</b><span>Quantum team</span><small>Research/Public + Research/Quantum</small></div>
+        <div class="hero-card"><b>Bob</b><span>Finance site member</span><small>Research/Public + Finance</small></div>
+        <div class="hero-card"><b>Carol</b><span>Direct share on Bio</span><small>Research/Public + Research/Bio</small></div>
+        <div class="hero-card warn"><b>HR site</b><span>No Sites.Selected grant</span><small>Never indexed, even though admin consent exists</small></div>
+      </div>
+      <button class="btn primary big" id="heroSignIn">Sign in with Microsoft Entra ID</button>
+      <p class="muted small">Sign in as one of the demo personas, then sign out and try another.</p>
+    </section>
+
+    <!-- Search -->
+    <section id="tab-search" class="panel hidden">
+      <form class="searchbar" id="searchForm">
+        <input id="q" placeholder="Search SharePoint content you can access…" autocomplete="off" />
+        <div class="seg" id="mode">
+          <button type="button" data-mode="keyword">Keyword</button>
+          <button type="button" data-mode="semantic">Semantic</button>
+          <button type="button" data-mode="hybrid" class="active">Hybrid</button>
+        </div>
+        <button class="btn primary" type="submit">Search</button>
+      </form>
+      <div class="chips" id="suggestions"></div>
+      <div class="result-meta" id="searchMeta"></div>
+      <div id="results" class="results"></div>
+    </section>
+
+    <!-- Ask -->
+    <section id="tab-ask" class="panel hidden">
+      <div class="chat" id="chatLog">
+        <div class="chat-empty">
+          <h3>Ask questions grounded in the documents <u>you</u> can read</h3>
+          <p class="muted">Retrieval uses your identity, so the model only ever receives ACL-trimmed chunks.</p>
+          <div class="chips" id="askSuggestions"></div>
+        </div>
+      </div>
+      <form class="chat-input" id="chatForm">
+        <input id="chatQ" placeholder="Ask a question…" autocomplete="off" />
+        <button class="btn primary" type="submit">Ask</button>
+      </form>
+    </section>
+
+    <!-- Proof -->
+    <section id="tab-proof" class="panel hidden">
+      <div class="panel-head">
+        <div>
+          <h2>Admin consent ≠ access</h2>
+          <p class="muted">The ingestion app has tenant admin consent for <code>Sites.Selected</code> — identical for all three sites.
+            Only the per-site grant differs. Below, the app calls Microsoft Graph <em>as itself</em> (app-only, secretless federated credential) and the indexer reports what it could read.</p>
+        </div>
+        <button class="btn" id="proofRefresh">Re-run probe</button>
+      </div>
+      <div id="tokenInfo"></div>
+      <div class="cards" id="proofCards"></div>
+    </section>
+
+    <!-- How -->
+    <section id="tab-how" class="panel hidden">
+      <h2>How it works</h2>
+      <div class="flow">
+        <div class="node sp">SharePoint<br><small>3 sites · folders with unique permissions</small></div>
+        <div class="arrow">→<small>indexer (schedule)<br>Sites.Selected · FIC</small></div>
+        <div class="node srch">Azure AI Search<br><small>chunks + vectors + <b>UserIds / GroupIds</b></small></div>
+        <div class="arrow">←<small>query + <code>x-ms-query-source-authorization</code></small></div>
+        <div class="node app">This app<br><small>user token from Entra sign-in</small></div>
+        <div class="arrow">→<small>trimmed chunks only</small></div>
+        <div class="node llm">Azure OpenAI<br><small>grounded answer</small></div>
+      </div>
+      <div class="how-grid">
+        <div class="card">
+          <h3>1 · Ingestion (least privilege, no secrets)</h3>
+          <ul>
+            <li>Ingestion app has <code>Sites.Selected</code> (Graph + SharePoint) — admin-consented.</li>
+            <li>Access is granted <b>per site</b> with <code>POST /sites/{id}/permissions</code>. HR is never granted.</li>
+            <li>The indexer authenticates through a <b>federated identity credential</b> that trusts the search service's managed identity.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>2 · ACLs travel with every chunk</h3>
+          <ul>
+            <li>Data source: <code>indexerPermissionOptions: ["userIds","groupIds"]</code>.</li>
+            <li>Index fields with <code>permissionFilter</code> and <code>permissionFilterOption: enabled</code>.</li>
+            <li>Index projections copy ACLs to each chunk; SharePoint site groups are stored as <code>spg:</code> IDs.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>3 · Enforcement at query time</h3>
+          <ul>
+            <li>The app's identity authorises the call; the <b>user's</b> token goes in <code>x-ms-query-source-authorization</code>.</li>
+            <li>Search expands transitive Entra groups (Graph) and SharePoint site groups, then filters before ranking.</li>
+            <li>No user token → no ACL-protected results. Failures return 5xx, never partial results.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>4 · Freshness</h3>
+          <ul>
+            <li>Indexer runs on a schedule (default every 15 min, minimum 5 min).</li>
+            <li>New/changed files and item-level permission changes: picked up on the next run.</li>
+            <li>Site/library/folder (parent-scope) changes: <code>/resync</code> with <code>permissions</code>.</li>
+            <li>Entra group membership changes: <b>immediate</b> — resolved at query time.</li>
+          </ul>
+        </div>
+      </div>
+      <h3>Expected results</h3>
+      <table class="matrix" id="matrix"></table>
+    </section>
+
+    <!-- Admin -->
+    <section id="tab-admin" class="panel hidden">
+      <div class="panel-head">
+        <div>
+          <h2>Admin console</h2>
+          <p class="muted">Elevated read (<code>x-ms-enable-elevated-read</code>) bypasses trimming to show the ACL stored on each chunk. Restricted to the demo admins group.</p>
+        </div>
+      </div>
+      <div class="admin-grid">
+        <div class="card">
+          <h3>Indexers <button class="btn small" id="ixRefresh">Refresh</button></h3>
+          <div id="indexers"></div>
+        </div>
+        <div class="card">
+          <h3>Live membership change</h3>
+          <p class="muted small">Add Carol to the <b>Quantum team</b> group, then sign in as Carol and search <code>AURORA</code>. No re-indexing needed — group membership is resolved at query time.</p>
+          <div id="membership"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Who can see what (elevated read)</h3>
+        <form class="searchbar compact" id="adminSearchForm">
+          <input id="adminQ" placeholder="* or a query" value="*" />
+          <button class="btn primary" type="submit">Inspect</button>
+        </form>
+        <div id="adminResults"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/vendor/msal-browser.min.js"></script>
+  <script type="module" src="/js/app.js"></script>
+</body>
+</html>

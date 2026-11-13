@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Signing in…</title>
+</head>
+<body>
+  <p style="font-family: system-ui, sans-serif">Completing sign-in…</p>
+  <script src="/vendor/msal-redirect-bridge.min.js"></script>
+  <script>
+    msalRedirectBridge.broadcastResponseToMainFrame().catch((e) => {
+      document.body.textContent = 'Sign-in error: ' + e.message;
+    });
+  </script>
+</body>
+</html>

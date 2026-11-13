@@ -1,0 +1,19 @@
+{
+  "name": "ixr-${SITE_KEY}",
+  "description": "Indexes ${SITE_URL} on a schedule (${INDEXER_SCHEDULE}). Incremental: new/changed files, deletions and item-level ACL changes.",
+  "dataSourceName": "ds-${SITE_KEY}",
+  "skillsetName": "sharepoint-acl-skillset",
+  "targetIndexName": "${SEARCH_INDEX_NAME}",
+  "schedule": { "interval": "${INDEXER_SCHEDULE}" },
+  "parameters": {
+    "maxFailedItems": -1,
+    "maxFailedItemsPerBatch": -1,
+    "configuration": {
+      "dataToExtract": "contentAndMetadata",
+      "parsingMode": "default",
+      "indexedFileNameExtensions": ".pdf,.docx,.pptx,.md,.txt"
+    }
+  },
+  "fieldMappings": [],
+  "outputFieldMappings": []
+}

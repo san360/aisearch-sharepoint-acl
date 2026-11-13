@@ -1,0 +1,65 @@
+{
+  "$comment": "CC BY 4.0 arXiv papers used as sample content. The setup script re-verifies each licence through the arXiv OAI-PMH metadata and only uploads Creative Commons Attribution papers. The PDFs are committed in data/papers (see ATTRIBUTION.md) and downloaded again only if missing.",
+  "sites": {
+    "research": {
+      "title": "ACL Demo - Research",
+      "description": "Research library. Granted to the ingestion app via Sites.Selected.",
+      "granted": true,
+      "folders": {
+        "Public": {
+          "access": "Inherits site permissions: All staff group (Read).",
+          "codeword": "BLUEBIRD",
+          "papers": [
+            { "id": "2611.12097", "title": "Calibrating Document-Local Boundaries for Contextual Chunk Retrieval" },
+            { "id": "2611.11549", "title": "Not All Branches Are Equal - Adaptive Semantic ID Construction for Generative Recommendation" }
+          ]
+        },
+        "Quantum": {
+          "access": "Unique permissions: Quantum team Entra group (Read) only.",
+          "codeword": "AURORA",
+          "papers": [
+            { "id": "2611.16607", "title": "Beauty and charm jet identification with end-to-end training on a superconducting quantum processor" },
+            { "id": "2611.16595", "title": "Gatemon qubits based on in-situ ternary InAsSb-Al nanowire Josephson junctions" }
+          ]
+        },
+        "Bio": {
+          "access": "Unique permissions: Carol directly (Read) only.",
+          "codeword": "KESTREL",
+          "papers": [
+            { "id": "2610.17699", "title": "Understanding Gene Expression-to-Image Learning - Spatial Structure and Information Fidelity" },
+            { "id": "2610.16093", "title": "CloneOT - predicting clone-specific perturbation responses with lineage-supervised neural inverse optimal transport" }
+          ]
+        }
+      }
+    },
+    "finance": {
+      "title": "ACL Demo - Finance",
+      "description": "Finance library. Granted to the ingestion app via Sites.Selected. Access through the SharePoint Members site group.",
+      "granted": true,
+      "folders": {
+        "Reports": {
+          "access": "Inherits site permissions: SharePoint site group 'Members' (Bob).",
+          "codeword": "NIGHTJAR",
+          "papers": [
+            { "id": "2610.07888", "title": "A Functional Representation of Credit Behavior for Probability of Default Modeling" },
+            { "id": "2610.05926", "title": "Comparing two approaches for modelling the loss given default of credit cards" }
+          ]
+        }
+      }
+    },
+    "hr": {
+      "title": "ACL Demo - HR Confidential",
+      "description": "HR library. Deliberately NOT granted to the ingestion app: admin consent for Sites.Selected does not grant access here.",
+      "granted": false,
+      "folders": {
+        "Confidential": {
+          "access": "Inherits site permissions: All staff group (Read). Never indexed because the app has no site grant.",
+          "codeword": "OSPREY",
+          "papers": [
+            { "id": "2611.02302", "title": "Owning What Can Quit" }
+          ]
+        }
+      }
+    }
+  }
+}
