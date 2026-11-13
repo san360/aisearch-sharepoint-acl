@@ -199,7 +199,11 @@ async function runSearch() {
       if (!docs.has(k)) docs.set(k, { ...r, chunks: [] });
       docs.get(k).chunks.push(r);
     }
-    $('#searchMeta').textContent = `${data.count} matching chunk(s) you can access · ${docs.size} document(s) · ${data.tookMs} ms · ${mode}`;
+    // Keyword hits carry @search.highlights; vector-only neighbours (hybrid) don't.
+    for (const d of docs.values()) d.keywordHit = d.chunks.some((c) => c.highlight);
+    const keywordDocs = [...docs.values()].filter((d) => d.keywordHit).length;
+    $('#searchMeta').textContent = `${data.count} matching chunk(s) you can access · ${docs.size} document(s)`
+      + (mode === 'hybrid' && q && q !== '*' ? ` (${keywordDocs} with a keyword match)` : '') + ` · ${data.tookMs} ms · ${mode}`;
     if (!docs.size) {
       $('#results').innerHTML = `
         <div class="empty"><div class="big">🔒</div>
@@ -208,12 +212,21 @@ async function runSearch() {
           Azure AI Search removed them before ranking — the app never received them.</p></div>`;
       return;
     }
-    $('#results').innerHTML = [...docs.values()].map((d) => {
-      const best = d.chunks[0];
+    const noKeyword = mode === 'hybrid' && q && q !== '*' && keywordDocs === 0
+      ? `<div class="infobox">🔒 <b>No document you can access contains “${esc(q)}”.</b> Hybrid search also runs a
+          <b>vector</b> query, which always returns the nearest chunks <i>you</i> are allowed to read, so the list below is
+          “closest by meaning”, not a match. Chunks from folders you can't access were removed before ranking — compare with
+          <b>Keyword</b> mode, or sign in as a persona who has access.</div>`
+      : '';
+    $('#results').innerHTML = noKeyword + [...docs.values()].map((d) => {
+      const best = d.chunks.find((c) => c.highlight) ?? d.chunks[0];
       const snippet = best.caption || best.highlight || esc(best.chunk?.slice(0, 320));
       const key = siteKey(d.site);
+      const matchBadge = mode === 'hybrid' && q && q !== '*'
+        ? (d.keywordHit ? '<span class="badge match">keyword match</span>' : '<span class="badge vec">vector neighbour only</span>')
+        : '';
       return `
-        <article class="result">
+        <article class="result${mode === 'hybrid' && !d.keywordHit && q && q !== '*' ? ' neighbour' : ''}">
           <div class="result-top">
             <a class="result-title" href="${esc(d.url)}" target="_blank" rel="noopener">${esc(d.title)}</a>
             <span class="score">${d.score != null ? `score ${Number(d.score).toFixed(2)}` : ''}</span>
@@ -222,6 +235,7 @@ async function runSearch() {
             <span class="badge site-${key}">${esc(siteName(d.site))}</span>
             ${folderOf(d.path) ? `<span class="badge">📁 ${esc(folderOf(d.path))}</span>` : ''}
             <span class="badge">${d.chunks.length} chunk(s)</span>
+            ${matchBadge}
           </div>
           <div class="snippet">${highlighted(snippet)}</div>
         </article>`;

@@ -4,6 +4,46 @@ Personas are created by the setup script. Their sign-in names and Temporary Acce
 `.azure/<env>/demo-credentials.txt`. Use a **private/incognito window per persona** (tokens are kept in session storage).
 The complete list of prompts and expected results per persona is in [test-plan.md](test-plan.md).
 
+## Who has access to what (and at which level)
+
+Permissions are granted at two scopes. **Site** means a role assignment on the site, which every folder and document
+inherits unless it has unique permissions. **Folder** means the folder broke inheritance, so only the listed principals (plus
+the site Owners group) can read the folder and every document in it.
+
+| Site / folder | Inheritance | Who has access | How it's granted | Level |
+|---|---|---|---|---|
+| **Research** (site) | — | *All staff* (Entra group: Alice, Bob, Carol) | Site role assignment | Read |
+| Research / **Public** | Inherits from site | *All staff* → Alice, Bob, Carol | Site (inherited) | Read |
+| Research / **Quantum** | **Unique** (inheritance broken) | *Quantum team* (Entra group: Alice) | Folder role assignment to an Entra group | Read |
+| Research / **Bio** | **Unique** (inheritance broken) | Carol | Folder role assignment to a **user** (direct) | Read |
+| **Finance** (site) | — | Bob | Member of the SharePoint **Members** site group (Bob added directly) | Edit (Members default) |
+| Finance / **Reports** | Inherits from site | Bob | Site (inherited, via the *Members* group) | Edit |
+| **HR** (site) | — | *All staff* → Alice, Bob, Carol | Site role assignment | Read |
+| HR / **Confidential** | Inherits from site | *All staff* → Alice, Bob, Carol | Site (inherited) | Read — **but never indexed** |
+
+The deploying admin owns all three sites (*Owners* SharePoint group, Full Control) and keeps access to the unique
+folders as well.
+
+### Per persona
+
+| Persona | Research / Public | Research / Quantum | Research / Bio | Finance / Reports | HR / Confidential (in SharePoint) | Visible in search |
+|---|---|---|---|---|---|---|
+| **Alice** | ✅ site Read (All staff) | ✅ folder Read (Quantum team group) | ⛔ | ⛔ no site access | ✅ site Read (All staff) | BLUEBIRD, AURORA |
+| **Bob** | ✅ site Read (All staff) | ⛔ unique, not listed | ⛔ unique, not listed | ✅ site Edit (SharePoint *Members* group) | ✅ site Read (All staff) | BLUEBIRD, NIGHTJAR |
+| **Carol** | ✅ site Read (All staff) | ⛔ unique, not listed | ✅ folder Read (direct user) | ⛔ no site access | ✅ site Read (All staff) | BLUEBIRD, KESTREL |
+| **admin@** | ✅ Owners (Full Control) | ✅ Owners | ✅ Owners | ✅ Owners | ✅ Owners | everything except OSPREY |
+
+### The ingestion app (what gets indexed)
+
+| Site | `Sites.Selected` grant | Result |
+|---|---|---|
+| Research | `read` | Indexed with item-level ACLs (`ixr-research`) |
+| Finance | `read` | Indexed with item-level ACLs (`ixr-finance`) |
+| HR | **none** | Graph returns 403. Azure AI Search refuses to create the indexer (`accessDenied`), so there are only **two** indexers. Everyone can read HR **in SharePoint**, yet OSPREY never appears in search |
+
+Each folder holds one *Access note* (with the codeword) and arXiv papers; documents inherit the folder's permissions. The
+full document list (D1–D14) is in [test-plan.md](test-plan.md#1-documents-and-who-can-read-them).
+
 ## 0. Set the scene (admin, *How it works* tab)
 
 * Three SharePoint sites, five folders, five codewords.

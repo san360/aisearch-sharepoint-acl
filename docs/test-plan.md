@@ -27,7 +27,9 @@ The deploying admin is the site owner of all three sites, so admin@ sees D1–D1
 ## 2. Search tab
 
 **Keyword** mode is an exact match and the cleanest proof. **Hybrid** mode always returns the nearest chunks the user can
-access, so a "no access" result shows up as *other* documents rather than an empty list.
+access, so a "no access" result shows up as *other* documents rather than an empty list. The app labels each hybrid
+result *keyword match* or *vector neighbour only*, and shows a banner when no accessible document contains the term
+(for example `AURORA` in Hybrid as Bob or Carol: only Public/Finance or Public/Bio neighbours, never Quantum).
 
 | # | Prompt | Mode | Alice | Bob | Carol |
 |---|---|---|---|---|---|
