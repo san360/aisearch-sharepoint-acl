@@ -56,7 +56,9 @@ flowchart LR
 | **setup** app | Public client | Delegated, consented for the deploying admin only: Graph `Sites.FullControl.All`, `Files.ReadWrite.All`, `User.ReadWrite.All`, `Group.ReadWrite.All`, `LicenseAssignment.ReadWrite.All`, `UserAuthenticationMethod.ReadWrite.All`, `Policy.ReadWrite.AuthenticationMethod`, `Organization.Read.All` · SharePoint `AllSites.FullControl` | Deployment-time only: create sites, folders, permissions, users, Sites.Selected grants. Safe to delete afterwards |
 | Deploying admin | User | `Search Service Contributor`, `Search Index Data Contributor`, `Cognitive Services OpenAI User` | Creating the search pipeline, local development |
 
-No API keys anywhere: Azure AI Search and Azure OpenAI have local (key) auth **disabled**.
+No API keys anywhere: Azure AI Search and Azure OpenAI have local (key) auth **disabled**. Step-by-step federated
+credential values and the "which ID goes where" table: [federated-identity.md](federated-identity.md). Index fields and
+the ACL fields (`UserIds`, `GroupIds`, `SharePointSiteUrl`): [index-schema.md](index-schema.md).
 
 ### Why the ingestion app needs both Microsoft Graph and SharePoint permissions
 

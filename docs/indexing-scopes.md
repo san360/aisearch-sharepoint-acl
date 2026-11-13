@@ -33,13 +33,13 @@ scenario, metadata only; REST `2026-08-01-preview`). Paths are *library / folder
 |---|---|---|---|---|
 | S1 | `defaultSiteLibrary` | `null` | ✅ 9 items | Documents/Public, Quantum, Bio — **not** Archive, **not** the subsite |
 | S2 | `allSiteLibraries` | `null` | ✅ 10 items | Documents/\* **+ Archive/Notes** — still no subsite |
-| S3 | `allSiteLibraries` | `includeSubsites=true` | ✅ 10 items + subsite | Same as S2 **plus every library of every subsite** (llmlab/Documents/Papers, Drafts) once the subsite exists |
+| S3 | `allSiteLibraries` | `includeSubsites=true` | ✅ 15 items | Same as S2 **plus every library of every subsite**: llmlab/Documents/Papers (3), Drafts (2). This demo's setting |
 | S4 | `useQuery` | `includeLibrary=<site>/Archive` | ✅ 1 item | Archive/Notes only |
 | S5 | `useQuery` | `includeLibrariesInSite=<site>;excludeLibrary=<site>/Archive` | ✅ 9 items | All libraries of the site except Archive |
 | S6 | `useQuery` | `includeFolder=<site>/Shared Documents/Quantum` | ✅ 3 items | Documents/Quantum only (recursive) |
 | S7 | `useQuery` | `includeFolder=…/Public;includeFolder=…/Bio` | ✅ 6 items | Two folders, repeated parameter |
 | S8 | `useQuery` | `includeLibrary=<site>/Shared Documents;excludeFolder=…/Quantum` | ✅ 6 items | Documents without Quantum (exclude wins) |
-| S9 | `useQuery` | `includeLibrariesInSite=<site>/llmlab` | ✅ subsite only | Only the subsite's libraries. Rejected at creation ("site … not found") while the subsite doesn't exist |
+| S9 | `useQuery` | `includeLibrariesInSite=<site>/llmlab` | ✅ 5 items | Only the subsite's libraries (Papers, Drafts). Rejected at creation ("site … not found") if the subsite doesn't exist |
 | S10 | `useQuery` | `Path:"…/Quantum"` (KQL) | ❌ rejected | `Unexpected keyword … in query property` — the indexer doesn't accept KQL |
 
 Notes:

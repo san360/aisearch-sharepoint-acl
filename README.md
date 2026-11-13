@@ -45,7 +45,9 @@ flowchart LR
 | HR / Confidential | *All staff* — but **no Sites.Selected grant** | – | – | – | OSPREY |
 
 Details: [docs/architecture.md](docs/architecture.md). Which libraries, folders and subsites get indexed with each
-data source setting (all tested): [docs/indexing-scopes.md](docs/indexing-scopes.md).
+data source setting (all tested): [docs/indexing-scopes.md](docs/indexing-scopes.md). The secretless sign-in — federated
+credential values, which ID goes where, required permissions: [docs/federated-identity.md](docs/federated-identity.md).
+Every index field and which ones carry the SharePoint user/group permissions: [docs/index-schema.md](docs/index-schema.md).
 
 ## Quick start
 
@@ -164,7 +166,8 @@ scripts/
 app/                          web app (server.mjs, src/, public/)
 data/papers/                  CC BY 4.0 sample PDFs + ATTRIBUTION.md
 demo/queries.http             raw REST queries (no token / persona / elevated read)
-docs/                         architecture, prerequisites, frequency, indexing scopes, proof, limitations, demo script, test plan
+docs/                         architecture, federated identity, index schema, prerequisites, frequency, indexing scopes,
+                              proof, limitations, demo script, test plan
 ```
 
 ## Clean up

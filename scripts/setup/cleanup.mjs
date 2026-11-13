@@ -5,7 +5,7 @@
 // site URLs, user names and app unique names can be reused right away by the next `azd up`.
 import readline from 'node:readline/promises';
 import { loadAzdEnv, log, env, sleep, HttpError } from './lib/util.mjs';
-import { graph, spo } from './lib/clients.mjs';
+import { graph, azdGraph, spo } from './lib/clients.mjs';
 import { SITES } from './steps/sharepoint.mjs';
 
 loadAzdEnv();
@@ -25,7 +25,7 @@ const purgeDirectoryObject = async (id, label) => {
   if (!purge || !id) return;
   for (let i = 0; i < 10; i++) {
     try {
-      await graph(`/directory/deletedItems/${id}`, { method: 'DELETE' });
+      await azdGraph(`/directory/deletedItems/${id}`, { method: 'DELETE' });
       log.ok(`purged ${label}`);
       return;
     } catch (e) {
@@ -65,7 +65,7 @@ log.step('Demo users');
 for (const p of ['ALICE', 'BOB', 'CAROL']) {
   const id = process.env[`PERSONA_${p}_ID`];
   if (!id) continue;
-  await ignore404(graph(`/users/${id}`, { method: 'DELETE' }));
+  await ignore404(azdGraph(`/users/${id}`, { method: 'DELETE' }));
   log.ok(`deleted ${env(`PERSONA_${p}_UPN`, id)}`);
   await purgeDirectoryObject(id, env(`PERSONA_${p}_UPN`, id));
 }
@@ -73,17 +73,18 @@ for (const p of ['ALICE', 'BOB', 'CAROL']) {
 log.step('Entra groups and app registrations');
 for (const k of ['GROUP_ALL_STAFF_ID', 'GROUP_QUANTUM_ID', 'GROUP_DEMO_USERS_ID', 'GROUP_ADMINS_ID']) {
   const id = process.env[k];
-  if (id) { await ignore404(graph(`/groups/${id}`, { method: 'DELETE' })); log.ok(`deleted group ${k}`); await purgeDirectoryObject(id, k); }
+  if (id) { await ignore404(azdGraph(`/groups/${id}`, { method: 'DELETE' })); log.ok(`deleted group ${k}`); await purgeDirectoryObject(id, k); }
 }
-// The setup app is deleted last because this script authenticates with it.
+// Entra objects are removed with the admin's azd session (the setup app has no Application.* scopes).
+// The setup app is deleted last because the SharePoint steps above authenticate with it.
 for (const k of ['INGEST_APP_CLIENT_ID', 'WEB_APP_CLIENT_ID', 'SETUP_APP_CLIENT_ID']) {
   const appId = process.env[k];
   if (!appId) continue;
-  const apps = (await graph(`/applications?$filter=appId eq '${appId}'&$select=id`)).value;
+  const apps = (await azdGraph(`/applications?$filter=appId eq '${appId}'&$select=id`)).value;
   for (const a of apps) {
-    await graph(`/applications/${a.id}`, { method: 'DELETE' });
+    await azdGraph(`/applications/${a.id}`, { method: 'DELETE' });
     log.ok(`deleted app ${k}`);
-    await purgeDirectoryObject(a.id, `app ${k}`); // works for the setup app too: its access token predates the deletion
+    await purgeDirectoryObject(a.id, `app ${k}`);
   }
   await sleep(500);
 }

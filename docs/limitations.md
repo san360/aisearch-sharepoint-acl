@@ -96,6 +96,6 @@ real browser; queries ran through the web app with the user's token. Detailed pr
 | Users not in an indexed site's user list | Whole query fails with 404 "User cannot be found" (see [above](#site-user-list)) — fixed by `ensureuser` |
 | Index schema | A field named `metadata_spo_item_path` is required; the `sharepointSiteUrl` field must be **filterable**, otherwise every write fails ("Unable to complete aggregations search request") |
 | Temporary Access Pass | Issuance returns 400 for a few minutes after the method is enabled (the script retries) |
-| `allSiteLibraries` + `includeSubsites=true` on the Research data source | Full crawl indexed the default library **and** the second *Archive* library (WREN visible to all three personas); per-container results in [indexing-scopes.md](indexing-scopes.md) |
+| `allSiteLibraries` + `includeSubsites=true` on the Research data source | Full crawl indexed the default library, the second *Archive* library (WREN, all three personas) **and** the *LLM Lab* subsite (HERON: Alice + Bob, MAGPIE: Bob) — 15 items with one grant and one indexer; per-container results in [indexing-scopes.md](indexing-scopes.md) |
 | KQL in the data source container query | Rejected at creation (*Unexpected keyword … in query property*) |
 | Subsite creation | Blocked by the tenant default; enabling it is UI-only |
