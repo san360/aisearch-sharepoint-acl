@@ -48,6 +48,7 @@ export function publicConfig() {
     graphAdminScope: 'https://graph.microsoft.com/GroupMember.ReadWrite.All',
     graphSiteGrantsScope: 'https://graph.microsoft.com/Sites.FullControl.All',
     graphReadScopes: ['https://graph.microsoft.com/Files.Read.All', 'https://graph.microsoft.com/Sites.Read.All'],
+    ingestClientId: config.ingestClientId,
     groups: config.groups,
     sites: config.sites.map(({ key, name, url, granted, folders, parent }) => ({ key, name, url, granted, folders, parent })),
     indexName: config.indexName,

@@ -22,6 +22,7 @@
       <button data-tab="proof">Sites.Selected proof</button>
       <button data-tab="how">How it works</button>
       <button data-tab="access">Access</button>
+      <button data-tab="lab">API lab</button>
       <button data-tab="admin" class="hidden" id="adminTabBtn">Admin</button>
     </nav>
     <div class="user" id="userArea">
@@ -180,6 +181,58 @@
       <p class="muted small">👥 Entra group · 🟦 SharePoint site group · 👤 user · Levels: Read, Edit, Full control.
         <b>Inherits from site</b>: the folder uses the site's permissions. <b>Unique</b>: inheritance is broken, so only the
         listed principals can open it — site-level grants such as <i>All staff</i> no longer apply.</p>
+    </section>
+
+    <!-- API lab -->
+    <section id="tab-lab" class="panel hidden">
+      <div class="panel-head">
+        <div>
+          <h2>API lab — grant and validate Sites.Selected</h2>
+          <p class="muted">The Microsoft Graph, SharePoint REST and Azure AI Search calls behind this demo, runnable from here.
+            👤 calls go from your browser to Graph with <b>your</b> delegated token, so they succeed only where SharePoint and
+            Entra let <i>you</i> in. 🤖 calls run on the server as the <b>ingestion app</b> (app-only, federated credential);
+            they are fixed and read-only. Granting needs <code>Sites.FullControl.All</code>, consented for the demo admin only —
+            everyone else can try and see Entra refuse the token. IDs returned by one call fill the next.</p>
+        </div>
+      </div>
+      <div class="lab">
+        <nav class="lab-nav" id="labNav"></nav>
+        <div class="lab-main card">
+          <h3 id="labTitle"></h3>
+          <div class="muted" id="labExplain"></div>
+          <div class="lab-row" id="labSiteWrap">
+            <label class="small">Site <select id="labSite"></select></label>
+          </div>
+          <div class="lab-vars" id="labVars"></div>
+          <div class="lab-req">
+            <select id="labMethod"></select>
+            <input id="labUrl" spellcheck="false" />
+          </div>
+          <div class="lab-row hidden" id="labScopeWrap">
+            <label class="small">Token
+              <select id="labScopeSel">
+                <option value="read">Files.Read.All + Sites.Read.All (everyone)</option>
+                <option value="admin">Sites.FullControl.All (admin only)</option>
+              </select></label>
+          </div>
+          <div id="labBodyWrap" class="hidden"><div class="small muted">Body</div><textarea id="labBody" rows="7" spellcheck="false"></textarea></div>
+          <div class="lab-actions">
+            <button class="btn primary" id="labRun">Run</button>
+            <button class="btn" id="labReset" title="Restore the URL and body">Reset</button>
+            <span id="labCopyWrap">
+              <select id="labCopy" class="btn">
+                <option value="">Copy as…</option>
+                <option value="http">HTTP</option>
+                <option value="ps">PowerShell (Microsoft Graph SDK)</option>
+                <option value="az">az rest</option>
+                <option value="ge">Open in Graph Explorer ↗</option>
+              </select>
+            </span>
+          </div>
+          <div id="labExpect"></div>
+          <div id="labResult"></div>
+        </div>
+      </div>
     </section>
 
     <!-- Admin -->

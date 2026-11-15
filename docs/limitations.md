@@ -18,6 +18,15 @@
 | More than 1,000 permission entries on one item | Entries beyond the limit might not be enforced. |
 | Custom Web API skill, knowledge store, enrichment cache, debug sessions | Drop ACLs; not used. |
 
+### SharePoint `User.Read.All` is tenant-wide
+
+The ingestion app's SharePoint **`User.Read.All`** application permission — required for query-time resolution of
+SharePoint site groups — is **not** limited by `Sites.Selected`. Measured in the API lab: without any grant on HR, the
+app can still list HR's SharePoint groups and their members (`/_api/web/sitegroups`, `…/users`), while every content
+call returns 403. It exposes group names and membership on every site, not documents. If your ACLs only use Entra users
+and groups, omit the SharePoint permissions and keep Graph `Sites.Selected` alone (see
+[federated-identity.md](federated-identity.md#required-permissions)).
+
 ## Freshness
 
 * ACLs are as fresh as the last indexer run. Item-level changes on items with unique permissions are incremental;
@@ -99,3 +108,7 @@ real browser; queries ran through the web app with the user's token. Detailed pr
 | `allSiteLibraries` + `includeSubsites=true` on the Research data source | Full crawl indexed the default library, the second *Archive* library (WREN, all three personas) **and** the *LLM Lab* subsite (HERON: Alice + Bob, MAGPIE: Bob) — 15 items with one grant and one indexer; per-container results in [indexing-scopes.md](indexing-scopes.md) |
 | KQL in the data source container query | Rejected at creation (*Unexpected keyword … in query property*) |
 | Subsite creation | Blocked by the tenant default; enabling it is UI-only |
+| `GET /sites/{subsite}/permissions` | 400 *notSupported*: `Sites.Selected` grants exist only on site collections |
+| Ingestion app (`read` grant) reading the site's grants or SharePoint role assignments | 403 — it can't see or widen its own access |
+| Grant → revoke on HR from the API lab | App's `GET` on HR went 403 → 200 → 403 (POST 201, PATCH 200, DELETE 204) |
+| SharePoint groups and members on HR (no grant) as the ingestion app | **200** — SharePoint `User.Read.All` is tenant-wide (see above) |

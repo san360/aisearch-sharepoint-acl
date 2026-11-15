@@ -105,6 +105,24 @@ Tokens are never echoed: `Authorization` and the user token are shown as `<… r
 
 Token strip: roles claim = `Sites.Selected`, obtained with a federated credential (no secret).
 
+## 4b. API lab tab
+
+Full matrix with measured results per persona and site: [api-lab.md](api-lab.md#operations-and-measured-results).
+
+| # | Persona | Operation (site) | Expected |
+|---|---|---|---|
+| L1 | Alice | *List folders* (Research) | Public, Quantum — Bio is missing |
+| L2 | Alice | *List folders as the app* (Research) | Bio, Public, Quantum |
+| L3 | Carol | *Get the site* (LLM Lab) | 403 |
+| L4 | Bob | *Get the site* → *List folders* → *Folder permissions* (Finance) | 200, Reports, full permission list (Bob has Edit) |
+| L5 | any | *Get the site as the app* (HR / Research) | 403 / 200 |
+| L6 | any persona | *List app grants on the site* | `no token` — AADSTS65001 |
+| L7 | any persona | *Folder permissions as the app* | 403 — admins only |
+| L8 | admin | *Grant the ingestion app* (HR) → *Get the site as the app* (HR) → *Revoke* | 201 → 200 → 204, then 403 again |
+| L9 | admin | *List app grants* (LLM Lab) | 400 notSupported |
+| L10 | any | *SharePoint site groups* (HR) | 200 — tenant-wide via SharePoint `User.Read.All` |
+| L11 | Alice / Bob | *Search the index as you* (`AURORA`) | 1 hit / 0 hits |
+
 ## 5. Admin tab (admin@ only)
 
 | # | Action | Expected |

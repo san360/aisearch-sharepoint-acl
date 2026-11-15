@@ -64,6 +64,8 @@ azd provision
 
 ## Try it yourself
 
+* **API lab tab:** run every call above from the web app — as yourself, as the ingestion app, or (admin) grant and
+  revoke HR and watch the app's `GET` on HR go 403 → 200 → 403. See [api-lab.md](api-lab.md).
 * Grant HR: `POST /sites/{hr-site-id}/permissions` (or set `"granted": true` for `hr` in
   [`scripts/setup/content.json`](../scripts/setup/content.json) and re-run `--only sharepoint`), run `ixr-hr` from the
   Admin tab, and `OSPREY` appears for Alice, Bob and Carol.

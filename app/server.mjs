@@ -8,6 +8,7 @@ import { chat } from './src/chat.mjs';
 import { proof } from './src/proof.mjs';
 import { liveMatrix, peopleAccessContext } from './src/matrix.mjs';
 import { userGroups, isAdmin, resolvePrincipals } from './src/graph.mjs';
+import { APP_OPS, runAppOp } from './src/lab.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const pub = path.join(here, 'public');
@@ -62,6 +63,17 @@ app.get('/api/proof', requireUser, wrap(async (_req, res) => res.json(await proo
 // Live "who can see what": stored ACLs + live group resolution, plus a real trimmed query for the caller.
 app.get('/api/matrix', requireUser, wrap(async (req, res) =>
   res.json(await liveMatrix(req.user, { admin: await isAdmin(req.user.oid).catch(() => false) }))));
+
+// API lab: fixed app-only operations as the ingestion app. Some are limited to the demo admins.
+app.post('/api/lab/run', requireUser, wrap(async (req, res) => {
+  const { op, site, itemId, groupId } = req.body ?? {};
+  const def = APP_OPS[op];
+  if (!def) return res.status(400).json({ error: `unknown operation '${op}'` });
+  if (def.admin && !(await isAdmin(req.user.oid).catch(() => false))) {
+    return res.status(403).json({ error: 'This app-only operation is limited to the demo admins group: it would reveal permissions or members you may not be able to see yourself.' });
+  }
+  res.json(await runAppOp(op, { site, itemId, groupId }));
+}));
 
 // ---------- Admin ----------
 const admin = express.Router();

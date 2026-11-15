@@ -55,3 +55,15 @@ export async function getToken(scopes = [cfg.searchScope]) {
     throw new Error('Redirecting to sign in…');
   }
 }
+
+// Silent only, never redirects: the API lab shows Entra's refusal (e.g. AADSTS65001, no consent for this user)
+// as the result instead of sending the user to a consent page.
+export async function tryToken(scopes) {
+  if (!account) throw new Error('Not signed in');
+  try {
+    const r = await pca.acquireTokenSilent({ account, scopes, forceRefresh: false });
+    return { token: r.accessToken, scopes: r.scopes };
+  } catch (e) {
+    return { error: { code: e.errorCode ?? e.name, message: e.errorMessage ?? e.message, subError: e.subError } };
+  }
+}

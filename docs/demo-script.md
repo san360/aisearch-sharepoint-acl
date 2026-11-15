@@ -251,6 +251,28 @@ Talking points:
 Ask tab: *How are large language models reshaping software engineering research?* — Alice and Bob get an answer from the
 LLM Lab paper; Carol gets "not in my sources".
 
+## 9. API lab: grant and validate by hand
+
+The **API lab** tab runs the Graph / SharePoint REST calls behind `Sites.Selected` ([api-lab.md](api-lab.md)).
+
+As **any persona** (pick a site at the top):
+
+1. *Get the site* → *List folders*: SharePoint trims the list for you (Alice sees Public + Quantum).
+2. *List folders as the app*: the ingestion app sees **all** folders — that's why ACLs must travel into the index.
+3. *Get the site as the app* on **HR** → **403**, on Research → 200. Same consent, different grant.
+4. *List app grants on the site* → **no token** (AADSTS65001): granting needs `Sites.FullControl.All`, consented for the
+   admin only.
+
+As the **admin**:
+
+1. HR → *List app grants* → empty. *Grant the ingestion app* → 201.
+2. *Get the site as the app* on HR → **200** now.
+3. *List app grants* → pick the grant → *Revoke the grant* → 204. *Get the site as the app* → 403 again.
+4. *SharePoint site groups* on HR → 200 even without a grant: SharePoint `User.Read.All` reads group names and
+   members tenant-wide ([limitations](limitations.md#sharepoint-userreadall-is-tenant-wide)).
+
+Each 👤 call has **Copy as… → PowerShell / az rest / Open in Graph Explorer** to repeat it outside the app.
+
 ## REST version
 
 [`demo/queries.http`](../demo/queries.http) runs the same queries with the VS Code REST Client so you can show the raw

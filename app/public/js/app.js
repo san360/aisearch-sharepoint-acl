@@ -1,4 +1,5 @@
 import { initAuth, signIn, signOut, currentAccount, getToken } from './auth.js';
+import { mountLab, loadLab } from './lab.js';
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
@@ -97,6 +98,7 @@ async function api(path, body, method = body ? 'POST' : 'GET') {
   if (!res.ok) {
     const err = new Error(data.error ?? `HTTP ${res.status}`);
     err.data = data;
+    err.status = res.status;
     throw err;
   }
   return data;
@@ -133,6 +135,7 @@ function showTab(name) {
   if (name === 'admin') loadAdmin();
   if (name === 'how') renderMatrix();
   if (name === 'access') loadAccess();
+  if (name === 'lab') loadLab();
   history.replaceState(null, '', `#${name}`);
 }
 
@@ -181,7 +184,7 @@ async function afterSignIn() {
   }
   renderUser();
   const want = location.hash.slice(1);
-  showTab(['search', 'ask', 'proof', 'how', 'access', 'admin'].includes(want) && (want !== 'admin' || me?.isAdmin) ? want : 'search');
+  showTab(['search', 'ask', 'proof', 'how', 'access', 'lab', 'admin'].includes(want) && (want !== 'admin' || me?.isAdmin) ? want : 'search');
 }
 
 // ---------- search ----------
@@ -749,6 +752,7 @@ async function boot() {
   $('#accessRefresh').onclick = loadAccess;
   $('#ixRefresh').onclick = loadIndexers;
   $('#adminSearchForm').onsubmit = (e) => { e.preventDefault(); adminSearch(); };
+  mountLab({ $, $$, esc, jsonHtml, api, toast, cfg: () => cfg, me: () => me, persona });
 
   const acc = await initAuth(cfg);
   if (acc) await afterSignIn();

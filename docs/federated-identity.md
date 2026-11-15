@@ -91,6 +91,10 @@ The resulting definitions ([`datasource.json`](../scripts/search/datasource.json
 | SharePoint | `Sites.Selected` | Read SharePoint **site group** permissions (Owners / Members / Visitors) — SharePoint REST only |
 | SharePoint | `User.Read.All` | Query-time: resolve which SharePoint site groups the searching user belongs to |
 
+`Sites.Selected` scopes the two `Sites.Selected` permissions only. SharePoint `User.Read.All` is tenant-wide: the app
+can read SharePoint group names and members on every site (no content) — measured in the [API lab](api-lab.md). Leave
+both SharePoint permissions out if you only use Entra users and groups.
+
 Admin consent alone gives access to **no** site. Each site needs a grant, made by an admin with
 `Sites.FullControl.All` (here: the setup script, delegated):
 

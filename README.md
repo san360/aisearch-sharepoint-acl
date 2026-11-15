@@ -11,6 +11,9 @@ An end-to-end, `azd up`-deployable demo that **proves** SharePoint permissions f
   live Graph probe returns **403**. Admin consent ≠ access.
 * **No secrets.** The indexer authenticates with a **federated identity credential** that trusts the search service's
   managed identity. Azure AI Search and Azure OpenAI have key auth disabled.
+* **Try the APIs yourself.** The *API lab* tab runs the Graph and SharePoint REST calls behind `Sites.Selected` — as you
+  (delegated), as the ingestion app (app-only) or, for the admin, granting and revoking a site — with raw requests,
+  responses and the expected result per persona ([docs/api-lab.md](docs/api-lab.md)).
 * **Fully automated.** Entra apps, consent, federated credentials and groups (Microsoft Graph Bicep), Azure resources,
   three SharePoint site collections (plus a second library and a subsite) with folders and unique permissions, demo users,
   CC BY arXiv papers, the search pipeline and the web app — one `azd up`. The only manual steps are the admin sign-ins
@@ -166,8 +169,8 @@ scripts/
 app/                          web app (server.mjs, src/, public/)
 data/papers/                  CC BY 4.0 sample PDFs + ATTRIBUTION.md
 demo/queries.http             raw REST queries (no token / persona / elevated read)
-docs/                         architecture, federated identity, index schema, prerequisites, frequency, indexing scopes,
-                              proof, limitations, demo script, test plan
+docs/                         architecture, federated identity, index schema, API lab, prerequisites, frequency,
+                              indexing scopes, proof, limitations, demo script, test plan
 ```
 
 ## Clean up
