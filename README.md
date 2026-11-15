@@ -130,9 +130,10 @@ The live Sites.Selected probe only works in Azure (it uses the managed identity 
 |---|---|
 | **Search** | Keyword / semantic / hybrid search as the signed-in user; codeword chips; "No results for you" when everything matching is protected; **raw request / response** JSON (tokens redacted) |
 | **Ask** | RAG chat; every question runs a new trimmed search with the user's token; citations link back to SharePoint; sample questions always visible; **New conversation** |
-| **Sites.Selected proof** | App-only Graph probe per site (200 vs 403), the token's `roles` claim, indexer status and errors |
+| **Sites.Selected proof** | App-only Graph probe per site (200 vs 403), the token's `roles` claim, indexer status and errors; admins also see each site's `Sites.Selected` app grants |
 | **How it works** | Flow, the four mechanisms and a **live** who-can-see-what matrix: admins get every persona computed from the stored ACLs + live group resolution; everyone gets their own row confirmed by real trimmed queries |
 | **Access** | Live from SharePoint via Graph with the user's own delegated token: every site and folder, its scope (site / inherits / unique), who is granted at which level (Read / Edit / Full control), links that open SharePoint in a new tab, and *You · SharePoint* vs *You · search*. Admins also get a column per persona |
+| **API lab** | Runnable Graph / SharePoint REST / Azure AI Search calls in five steps (who am I → discover the site as you → grant `Sites.Selected` → validate as the ingestion app → validate in search), with raw request/response, expected result per persona and site, IDs chained between calls, and *Copy as* HTTP / PowerShell / `az rest` / Graph Explorer. Granting and permission-revealing app calls are admin-only ([docs/api-lab.md](docs/api-lab.md)) |
 | **Admin** *(admins group)* | Elevated read: every chunk with its `UserIds`/`GroupIds` resolved to names · indexer status, **Run now**, **Resync ACLs** · live group-membership toggle |
 
 Stack: Node.js (Express 5), vanilla HTML/CSS/ES modules (no build step), MSAL Browser v5 (SPA + PKCE, redirect bridge),
