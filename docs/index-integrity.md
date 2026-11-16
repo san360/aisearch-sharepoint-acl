@@ -1,5 +1,8 @@
 # Index integrity: who can tamper with permissions in the index, and the guardrails
 
+> The full role-by-role view across Azure, Entra ID and SharePoint, the platform guardrails and the audit logs that
+> record each change: [roles-and-audit.md](roles-and-audit.md).
+
 Azure AI Search enforces SharePoint permissions at query time from the **ACL values stored in the index**
 (`UserIds`, `GroupIds`, `SharePointSiteUrl`) and from index-level settings (`permissionFilterOption`,
 `sharePointConnectorAppRegistration`). SharePoint isn't asked again at query time — except to resolve SharePoint

@@ -57,7 +57,8 @@ flowchart LR
 | Deploying admin | User | `Search Service Contributor`, `Search Index Data Contributor`, `Cognitive Services OpenAI User` | Creating the search pipeline, local development |
 
 No API keys anywhere: Azure AI Search and Azure OpenAI have local (key) auth **disabled**. Who could still alter the
-ACLs stored in the index, the measured attacks and the guardrails: [index-integrity.md](index-integrity.md). Step-by-step federated
+ACLs stored in the index, the measured attacks and the guardrails: [index-integrity.md](index-integrity.md). Roles,
+platform guardrails and audit logs per service: [roles-and-audit.md](roles-and-audit.md). Step-by-step federated
 credential values and the "which ID goes where" table: [federated-identity.md](federated-identity.md). Index fields and
 the ACL fields (`UserIds`, `GroupIds`, `SharePointSiteUrl`): [index-schema.md](index-schema.md).
 

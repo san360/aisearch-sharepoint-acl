@@ -13,7 +13,9 @@ An end-to-end, `azd up`-deployable demo that **proves** SharePoint permissions f
   managed identity. Azure AI Search and Azure OpenAI have key auth disabled.
 * **Tamper-aware.** The stored ACLs are the security boundary, so the web app's identity can't write documents or change
   the index, search logs go to Log Analytics, and `verify-acls.mjs` compares the index with SharePoint and repairs drift.
-  Measured attacks and guardrails: [docs/index-integrity.md](docs/index-integrity.md).
+  Measured attacks and guardrails: [docs/index-integrity.md](docs/index-integrity.md). Who can change what in Azure,
+  Entra ID and SharePoint, the platform guardrails and which audit log records each change:
+  [docs/roles-and-audit.md](docs/roles-and-audit.md).
 * **Try the APIs yourself.** The *API lab* tab runs the Graph and SharePoint REST calls behind `Sites.Selected` — as you
   (delegated), as the ingestion app (app-only) or, for the admin, granting and revoking a site — with raw requests,
   responses and the expected result per persona ([docs/api-lab.md](docs/api-lab.md)).
@@ -175,8 +177,8 @@ scripts/
 app/                          web app (server.mjs, src/, public/)
 data/papers/                  CC BY 4.0 sample PDFs + ATTRIBUTION.md
 demo/queries.http             raw REST queries (no token / persona / elevated read)
-docs/                         architecture, federated identity, index schema, index integrity, API lab, prerequisites,
-                              frequency, indexing scopes, proof, limitations, demo script, test plan
+docs/                         architecture, federated identity, index schema, index integrity, roles and audit, API lab,
+                              prerequisites, frequency, indexing scopes, proof, limitations, demo script, test plan
 ```
 
 ## Clean up
