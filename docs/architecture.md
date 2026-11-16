@@ -51,12 +51,13 @@ flowchart LR
 |---|---|---|---|
 | **spo-ingest** app | App registration, **no secret** | Graph `Sites.Selected` · SharePoint `Sites.Selected`, `User.Read.All` (application, admin-consented) + **per-site grant** on Research and Finance only | SharePoint indexer (content + ACLs), query-time SharePoint site group resolution |
 | Search UAMI | User-assigned managed identity | Federated credential subject on spo-ingest · `Cognitive Services OpenAI User` | Indexer → SharePoint, embeddings, query vectorizer |
-| Web UAMI | User-assigned managed identity | `Search Index Data Reader/Contributor`, `Search Service Contributor`, `Cognitive Services OpenAI User`, `AcrPull`, Graph `GroupMember.Read.All` + `User.ReadBasic.All` (application), FIC subject on spo-ingest | Query authorisation, chat, admin views, Sites.Selected probe and the API lab's app-only calls |
+| Web UAMI | User-assigned managed identity | Custom role *Search ACL demo web app* (query `documents/read`, `indexes/read`, `indexers/read`, `indexers/write` — **no** document writes, schema/pipeline changes or keys), `Cognitive Services OpenAI User`, `AcrPull`, Graph `GroupMember.Read.All` + `User.ReadBasic.All` (application), FIC subject on spo-ingest | Query authorisation, chat, admin views, Sites.Selected probe and the API lab's app-only calls |
 | **web** app | SPA app registration | Delegated, consented for all users: `openid profile offline_access User.Read`, `Files.Read.All`, `Sites.Read.All` (Access tab and API lab: read SharePoint as the user — bounded by the user's own access), Azure AI Search `user_impersonation`. Consented for the deploying admin only: `GroupMember.ReadWrite.All` (live membership change), `Sites.FullControl.All` (Proof tab and API lab: read, create, change and revoke the Sites.Selected grants of each site) | End-user sign-in/out; the user token is what Azure AI Search uses to trim results |
 | **setup** app | Public client | Delegated, consented for the deploying admin only: Graph `Sites.FullControl.All`, `Files.ReadWrite.All`, `User.ReadWrite.All`, `Group.ReadWrite.All`, `LicenseAssignment.ReadWrite.All`, `UserAuthenticationMethod.ReadWrite.All`, `Policy.ReadWrite.AuthenticationMethod`, `Organization.Read.All` · SharePoint `AllSites.FullControl` | Deployment-time only: create sites, folders, permissions, users, Sites.Selected grants. Safe to delete afterwards |
 | Deploying admin | User | `Search Service Contributor`, `Search Index Data Contributor`, `Cognitive Services OpenAI User` | Creating the search pipeline, local development |
 
-No API keys anywhere: Azure AI Search and Azure OpenAI have local (key) auth **disabled**. Step-by-step federated
+No API keys anywhere: Azure AI Search and Azure OpenAI have local (key) auth **disabled**. Who could still alter the
+ACLs stored in the index, the measured attacks and the guardrails: [index-integrity.md](index-integrity.md). Step-by-step federated
 credential values and the "which ID goes where" table: [federated-identity.md](federated-identity.md). Index fields and
 the ACL fields (`UserIds`, `GroupIds`, `SharePointSiteUrl`): [index-schema.md](index-schema.md).
 

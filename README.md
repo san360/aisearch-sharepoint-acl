@@ -11,6 +11,9 @@ An end-to-end, `azd up`-deployable demo that **proves** SharePoint permissions f
   live Graph probe returns **403**. Admin consent ≠ access.
 * **No secrets.** The indexer authenticates with a **federated identity credential** that trusts the search service's
   managed identity. Azure AI Search and Azure OpenAI have key auth disabled.
+* **Tamper-aware.** The stored ACLs are the security boundary, so the web app's identity can't write documents or change
+  the index, search logs go to Log Analytics, and `verify-acls.mjs` compares the index with SharePoint and repairs drift.
+  Measured attacks and guardrails: [docs/index-integrity.md](docs/index-integrity.md).
 * **Try the APIs yourself.** The *API lab* tab runs the Graph and SharePoint REST calls behind `Sites.Selected` — as you
   (delegated), as the ingestion app (app-only) or, for the admin, granting and revoking a site — with raw requests,
   responses and the expected result per persona ([docs/api-lab.md](docs/api-lab.md)).
@@ -101,6 +104,7 @@ node scripts/setup/index.mjs --only users        # re-issue Temporary Access Pas
 node scripts/setup/index.mjs --only sharepoint   # sites, content, permissions, grants (idempotent)
 node scripts/setup/index.mjs --only search       # index, skillset, data sources, indexers
 node scripts/setup/validate-scopes.mjs           # test which items each data source container setting indexes
+node scripts/setup/verify-acls.mjs               # index integrity: settings + ACLs vs SharePoint (--fix to resync)
 ```
 
 ### What still needs a human
@@ -164,14 +168,15 @@ scripts/
   setup/steps/sharepoint.mjs  sites, papers, folder ACLs, site user lists, Sites.Selected grants
   setup/steps/search.mjs      index / skillset / data sources / indexers
   setup/validate-scopes.mjs   test each data source container option against a scratch index
+  setup/verify-acls.mjs       detect tampering: permission settings + stored ACLs vs a fresh SharePoint crawl
   setup/cleanup.mjs           remove what azd down doesn't (sites, users, apps, groups)
   setup/content.json          sites, libraries, subsites, folders, codewords, arXiv paper IDs, data source container
   search/*.json               search object templates
 app/                          web app (server.mjs, src/, public/)
 data/papers/                  CC BY 4.0 sample PDFs + ATTRIBUTION.md
 demo/queries.http             raw REST queries (no token / persona / elevated read)
-docs/                         architecture, federated identity, index schema, API lab, prerequisites, frequency,
-                              indexing scopes, proof, limitations, demo script, test plan
+docs/                         architecture, federated identity, index schema, index integrity, API lab, prerequisites,
+                              frequency, indexing scopes, proof, limitations, demo script, test plan
 ```
 
 ## Clean up

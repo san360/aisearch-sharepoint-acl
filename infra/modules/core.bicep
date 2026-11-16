@@ -131,7 +131,6 @@ resource containerAppsEnv 'Microsoft.App/managedEnvironments@2024-03-01' = {
 // ---------- Role assignments ----------
 var roles = {
   openAiUser: '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
-  searchIndexDataReader: '1407120a-92aa-4202-b7e9-c0e197c71c8f'
   searchIndexDataContributor: '8ebe5a00-799e-43f5-93ac-243d3dce84a7'
   searchServiceContributor: '7ca78c08-252a-4471-8644-bb5ff32d4ba0'
   acrPull: '7f951dda-4ed3-4680-a7ca-43fe172d538d'
@@ -159,20 +158,53 @@ resource webToOpenAi 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   }
 }
 
-// Web identity -> Search. Index Data Contributor includes the elevated-read
-// permission used by the admin view; Service Contributor lets admins run and
-// resync indexers from the app. End-user queries are still ACL-trimmed because
-// the user's own token is sent in x-ms-query-source-authorization.
-var webSearchRoles = [roles.searchIndexDataReader, roles.searchIndexDataContributor, roles.searchServiceContributor]
-resource webToSearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = [for r in webSearchRoles: {
+// Web identity -> Search, least privilege (custom role). The app only needs to:
+//   query (documents/read; results are still ACL-trimmed with the user's token), read index stats, read indexer
+//   status and run/resync indexers from the Admin tab. It can NOT upload or merge documents (so it can't rewrite
+//   UserIds/GroupIds), change the index, skillset or data sources, turn off permissionFilterOption, or touch keys.
+//   Elevated read is done with the admin's own token, not this identity. See docs/index-integrity.md.
+resource webSearchRole 'Microsoft.Authorization/roleDefinitions@2022-04-01' = {
+  name: guid(resourceGroup().id, 'search-acl-demo-web')
+  properties: {
+    roleName: 'Search ACL demo web app (${resourceToken})'
+    description: 'Query an index, read index stats and indexer status, run/resync indexers. No document writes, no schema or pipeline changes, no keys.'
+    type: 'CustomRole'
+    assignableScopes: [resourceGroup().id]
+    permissions: [
+      {
+        actions: [
+          'Microsoft.Search/searchServices/indexes/read'
+          'Microsoft.Search/searchServices/indexers/read'
+          'Microsoft.Search/searchServices/indexers/write'
+        ]
+        dataActions: [
+          'Microsoft.Search/searchServices/indexes/documents/read'
+        ]
+      }
+    ]
+  }
+}
+
+resource webToSearch 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: search
-  name: guid(search.id, webIdentity.id, r)
+  name: guid(search.id, webIdentity.id, 'search-acl-demo-web')
   properties: {
     principalId: webIdentity.properties.principalId
     principalType: 'ServicePrincipal'
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', r)
+    roleDefinitionId: webSearchRole.id
   }
-}]
+}
+
+// Search diagnostic logs (index/indexer/data source changes, document uploads, queries) for tamper detection.
+resource searchDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
+  name: 'search-to-log-analytics'
+  scope: search
+  properties: {
+    workspaceId: logs.id
+    logs: [{ categoryGroup: 'allLogs', enabled: true }]
+    metrics: [{ category: 'AllMetrics', enabled: true }]
+  }
+}
 
 resource webToAcr 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   scope: registry

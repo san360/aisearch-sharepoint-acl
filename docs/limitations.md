@@ -27,6 +27,13 @@ call returns 403. It exposes group names and membership on every site, not docum
 and groups, omit the SharePoint permissions and keep Graph `Sites.Selected` alone (see
 [federated-identity.md](federated-identity.md#required-permissions)).
 
+## Index integrity
+
+The index, not SharePoint, decides at query time. Anyone with *Search Index Data Contributor* can merge
+`"UserIds": ["all"]` onto a chunk and make it public (measured); anyone with *Search Service Contributor* can disable
+`permissionFilterOption`. The indexer doesn't undo either on its next run. Guardrails, detection
+(`verify-acls.mjs`) and recovery: [index-integrity.md](index-integrity.md).
+
 ## Freshness
 
 * ACLs are as fresh as the last indexer run. Item-level changes on items with unique permissions are incremental;

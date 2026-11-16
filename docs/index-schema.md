@@ -46,6 +46,10 @@ A chunk is returned if **any** of them matches (`UserIds` ∩ {user} ∪ `GroupI
 the engine before ranking, so trimmed chunks never influence scores, captions or answers. The app doesn't add any
 `$filter`.
 
+Two special values exist: `"all"` (any user matches) and `"none"` (same as an empty list). The SharePoint indexer never
+writes them, so finding `"all"` in this index means someone wrote it directly — see
+[index-integrity.md](index-integrity.md).
+
 The ingested values are SharePoint's **effective** permissions on the item: site-level permissions when the folder
 inherits, the unique permissions when it doesn't. Sharing links, "Everyone" claims and guests aren't supported
 ([limitations.md](limitations.md)).

@@ -144,6 +144,19 @@ Full matrix with measured results per persona and site: [api-lab.md](api-lab.md#
 | N4 | Look at the PDFs' sharing links: an "Anyone"/"People in your organization" link is **not** honoured | Document remains hidden from users who only have the link |
 | N5 | Entra group nested inside a SharePoint group | Not expanded: users who reach a document only this way get no result |
 
+## 6b. Index integrity (admin; reverted after each test)
+
+Details and commands: [index-integrity.md](index-integrity.md).
+
+| # | Action | Expected |
+|---|---|---|
+| T1 | `node scripts/setup/verify-acls.mjs` on a clean deployment | All settings intact; every chunk matches SharePoint; exit 0 |
+| T2 | Merge `"UserIds": ["all"]` onto the AURORA chunk (needs *Search Index Data Contributor*), Bob searches `AURORA` | Bob: 0 results before, **1 after** — the attack works |
+| T3 | Run `ixr-research` (incremental) | 0 items processed, the tampered value stays |
+| T4 | `verify-acls.mjs --fix` | Flags `["all"]` and the drift (exit 1), starts resync; next check exit 0 and Bob is back to 0 results |
+| T5 | Set `permissionFilterOption` to `disabled`, query without a user token / Bob searches in the app | 445 of 445 chunks without a token; the app gets HTTP 400 (fails closed). `verify-acls.mjs --config` flags it |
+| T6 | Admin tab *Run now* / *Resync ACLs* and the Proof tab | Still work with the web identity's custom role (no document writes) |
+
 ## Recorded results
 
 ### How to validate a hybrid result manually
